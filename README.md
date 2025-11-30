@@ -1,4 +1,4 @@
-*Note:* WAFFLE is currently in development. This note will be taken down when WAFFLE is fully ready to use. Bon appé‑tech! 🧇🚀
+*Note:* WAFFLE is currently in development. This note will be taken down when WAFFLE is fully ready to use.
 
 ## 🧇 The WAFFLE Manifesto
 
@@ -45,3 +45,7 @@ We *really* believe in [**Go**](https://go.dev/).
 ### 🧇 Go Get WAFFLE
 
 [**Go**](https://go.dev/) install it. [**Go**](https://go.dev/) scaffold your app. [**Go**](https://go.dev/) route your requests. [**Go**](https://go.dev/) layer your logic. [**Go**](https://go.dev/) serve your stack. [**Go**](https://go.dev/) build something delicious.
+
+Happy engineering—and enjoy your WAFFLE 🧇.
+
+Bon appé‑tech! 🧇🚀
