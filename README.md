@@ -44,4 +44,4 @@ We *really* believe in [**Go**](https://go.dev/).
 
 ### 🧇 Go Get WAFFLE
 
-Go install it. Go scaffold your app. Go route your requests. Go layer your logic. Go serve your stack. Go build something delicious.
+[**Go**](https://go.dev/) install it. [**Go**](https://go.dev/) scaffold your app. [**Go**](https://go.dev/) route your requests. [**Go**](https://go.dev/) layer your logic. [**Go**](https://go.dev/) serve your stack. [**Go**](https://go.dev/) build something delicious.
