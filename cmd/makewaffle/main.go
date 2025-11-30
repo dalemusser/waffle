@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	os.Exit(wafflegen.Run("wafflectl", os.Args[1:]))
+	os.Exit(wafflegen.Run("makewaffle", os.Args[1:]))
 }
