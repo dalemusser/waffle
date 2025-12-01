@@ -51,6 +51,7 @@ We *really* believe in [**Go**](https://go.dev/).
 - **[WAFFLE Framework – Developer Documentation](docs/developer-documentation.md)**
 - **[WAFFLE Routes & Middleware Guide](docs/routes-and-middleware-guide.md)**
 - **[Examples](docs/examples/)** — AppConfig patterns, database integration, routes, middleware, and more
+- **[All WAFFLE Documents](docs/waffle-docs.md)**
 
 ---
 

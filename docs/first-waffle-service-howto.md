@@ -213,9 +213,11 @@ But later, you’ll modify:
 
 **Want to peek at real examples?**
 
-- [MongoDB ConnectDB example](./examples/dbdeps_mongo.md)  
-- [Adding additional routes](./examples/routes_examples.md)  
-- [Using middleware in BuildHandler](./examples/middleware_examples.md)
+- [MongoDB in DBDep](./examples/dbdeps-mongo.md)  
+- [Postgres in DBDeps](./examples/dbdeps-postgres.md)
+- [Redis in DBDeps](./examples/dbdeps-redis.md)
+- [Adding additional routes](./examples/routes-examples.md)  
+- [Using middleware in BuildHandler](./examples/middleware-examples.md)
 
 ---
 
