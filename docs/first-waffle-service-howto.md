@@ -178,9 +178,9 @@ As soon as your app needs to talk to a database or external service.
 **Curious what this looks like?**  
 Examples:
 
-- [Using MongoDB with DBDeps](./examples/dbdeps_mongo.md)  
-- [Using Postgres with DBDeps](./examples/dbdeps_postgres.md)  
-- [Using Redis with DBDeps](./examples/dbdeps_redis.md)
+- [MongoDB with DBDeps](./examples/dbdeps-mongo.md)  
+- [Postgres with DBDeps](./examples/dbdeps-postgres.md)  
+- [Redis with DBDeps](./examples/dbdeps-redis.md)
 
 ---
 
@@ -213,11 +213,7 @@ But later, you’ll modify:
 
 **Want to peek at real examples?**
 
-- [MongoDB in DBDep](./examples/dbdeps-mongo.md)  
-- [Postgres in DBDeps](./examples/dbdeps-postgres.md)
-- [Redis in DBDeps](./examples/dbdeps-redis.md)
-- [Adding additional routes](./examples/routes-examples.md)  
-- [Using middleware in BuildHandler](./examples/middleware-examples.md)
+- [Routes & Middleware Guide](./routes-and-middleware-guide.md)
 
 ---
 
@@ -330,9 +326,6 @@ In a **web browser**, visit:
 http://localhost:8080/about
 ```
 
-**Optional deeper dive:**  
-[Routes and Middleware Guide](./routes-and-middleware-guide.md)
-
 ---
 
 # 🧰 6. Optional Enhancements (WAFFLE Toolkit)
@@ -364,8 +357,7 @@ To enable CORS:
    r.Use(cors.Default())
    ```
 
-More CORS examples:  
-[Advanced CORS patterns](./examples/cors_examples.md)
+[CORS Examples](./examples/cors_examples.md)
 
 ---
 

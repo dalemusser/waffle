@@ -13,6 +13,19 @@ A list of documentation topics, guides, and example pages to create in future pa
 - **HTML template rendering** using Go templates in WAFFLE
 - **WebSocket endpoints** (chat, notifications, real-time updates)
 - **High-security admin panels** (admin auth, roles, middleware patterns)
+- **Preflight debugging examples**
+- **CORS + JSON API patterns**
+- **CORS setups for frontend SPAs served from another domain**
+
+- **Request tracing examples**
+- **Panic recovery middleware patterns**
+- **Versioned API examples (`/v1`, `/v2`)**
+- **JSON API examples (full request/response patterns)**
+- **HTML template rendering examples (views, partials, layout patterns)**
+- **WebSocket examples (real-time chat, notifications)**
+- **Chained custom middleware examples**
+- **Advanced DBDeps struct organization**
+- **Role-based routing examples**
 
 ## Notes
 This file tracks ideas we do not want to lose while focusing on top‑level documentation first.

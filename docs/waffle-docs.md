@@ -1,5 +1,3 @@
-
-
 # WAFFLE Documentation Index  
 *A complete, organized directory of all WAFFLE guides, references, and examples.*
 
@@ -39,6 +37,11 @@ All live under `docs/examples/`.
 
 ### **Configuration Patterns**
 - **[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)**
+- **[CORS Examples](./examples/cors-examples.md)**
+- **[DBDeps Usage Examples](./examples/dbdeps-usage-examples.md)**
+- **[Handler Structure Examples](./examples/handler-structure-examples.md)**
+- **[Middleware Examples](./examples/middleware-examples.md)**
+- **[Route Examples](./examples/routes-examples.md)**
 
 ### **(Reserved for future examples — see to‑do list)**
 - Migrations (`golang-migrate`)
@@ -58,20 +61,24 @@ All live under `docs/examples/`.
 ```
 docs/
 │
-├── developer-documentation.md
-├── first-waffle-service-howto.md
-├── quickstart-guide.md
-├── routes-and-middleware-guide.md
+├── [developer-documentation.md](./developer-documentation.md)
+├── [first-waffle-service-howto.md](./first-waffle-service-howto.md)
+├── [quickstart-guide.md](./quickstart-guide.md)
+├── [routes-and-middleware-guide.md](./routes-and-middleware-guide.md)
 │
 ├── examples/
-│   ├── dbdeps-mongo.md
-│   ├── dbdeps-postgres.md
-│   ├── dbdeps-postgres-pgxpool.md
-│   ├── dbdeps-redis.md
-│   └── examples-of-appconfig-patterns.md
+│   ├── [dbdeps-mongo.md](./examples/dbdeps-mongo.md)
+│   ├── [dbdeps-postgres.md](./examples/dbdeps-postgres.md)
+│   ├── [dbdeps-postgres-pgxpool.md](./examples/dbdeps-postgres-pgxpool.md)
+│   ├── [dbdeps-redis.md](./examples/dbdeps-redis.md)
+│   ├── [dbdeps-usage-examples.md](./examples/dbdeps-usage-examples.md)
+│   ├── [handler-structure-examples.md](./examples/handler-structure-examples.md)
+│   ├── [middleware-examples.md](./examples/middleware-examples.md)
+│   ├── [routes-examples.md](./examples/routes-examples.md)
+│   └── [examples-of-appconfig-patterns.md](./examples/examples-of-appconfig-patterns.md)
 │
 └── to-do/
-    └── to-do.md
+    └── [to-do.md](./to-do/to-do.md)
 ```
 
 ---
@@ -82,4 +89,3 @@ docs/
 - Returning users → jump to **Quickstart** or **Routes & Middleware Guide**  
 - Need to integrate a database? → check **Database Integration** recipes  
 - Looking for patterns? → see **Configuration Patterns** and upcoming recipes
-
