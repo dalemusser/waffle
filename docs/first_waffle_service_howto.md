@@ -1,74 +1,131 @@
 # How to Write Your First WAFFLE Service  
-*A hands-on, step-by-step guide to creating your first WAFFLE-powered Go web application.*
+*A hands-on, beginner‑friendly guide to creating, running, and understanding your first WAFFLE-powered Go web application.*
 
 ---
 
 # 🧇 Introduction
 
-WAFFLE — the **Web Application Framework for Flavorful Layered Engineering** — gives you a clean, structured backbone for modern Go web applications.
+WAFFLE — the **Web Application Framework for Flavorful Layered Engineering** — gives you a clean, structured, and deliciously modular starting point for building Go web services.
 
-In this guide, you’ll build your first WAFFLE service from scratch. No fluff, no detours — just the essential steps to get you productive fast.
+In this guide, you will:
+
+- Scaffold a brand‑new WAFFLE app
+- Run it immediately (instant success!)
+- Open the project in VSCode
+- Take a guided tour of each important file WAFFLE generated
+- Add your first route
+- Explore optional enhancements (CORS, Windows services)
+- Follow links to **short example documents** if you want to see deeper patterns
+
+This guide keeps the required steps simple and introduces complexity only when *you* decide to click into it.
 
 ---
 
-# 🏁 1. Create a New Project
+# 🏁 1. Install the WAFFLE CLI (makewaffle)
 
-Choose a name for your app and create a new folder:
+To generate new WAFFLE services, install the **makewaffle** command:
 
 ```bash
-mkdir hello_waffle
-cd hello_waffle
-go mod init github.com/you/hello_waffle
+go install github.com/dalemusser/waffle/cmd/makewaffle@latest
 ```
 
----
+After installation, ensure that your Go bin directory  
+(often `~/go/bin`) is on your system PATH so the `makewaffle` command is accessible.
 
-# 🧇 2. Install WAFFLE
+> **Optional:**  
+> WAFFLE also provides a CLI named **wafflectl**, following common industry naming conventions (like `kubectl`).  
+> You may substitute `wafflectl` for `makewaffle` in any command.  
+> This guide uses **makewaffle** for clarity and approachability.
 
-Pull in the WAFFLE framework:
+# 🧱 2. Generate Your First WAFFLE Project
+
+Now that you have the WAFFLE CLI installed, you can generate a full project scaffold using `makewaffle`.
+
+Generate a new service called **hello**:
 
 ```bash
-go get github.com/dalemusser/waffle
+makewaffle new hello \
+  --module github.com/you/hello
 ```
 
----
-
-# 🗂️ 3. Create the WAFFLE Directory Structure
-
-WAFFLE encourages a clean separation of concerns.
-
-Run:
+Now enter the project directory — you will stay in this directory for the rest of the steps:
 
 ```bash
-mkdir -p cmd/hello
-mkdir -p internal/app/bootstrap
-mkdir -p internal/app/features
-mkdir -p internal/app/store
-mkdir -p internal/app/policy
-mkdir -p internal/domain/models
+cd hello
 ```
 
-Your structure now looks like this:
+Once inside the project directory, prepare your module:
 
+```bash
+go mod tidy
 ```
-cmd/hello/
-internal/
-  app/
-    bootstrap/
-    features/
-    store/
-    policy/
-  domain/
-    models/
-```
+
+You now have a fully‑structured WAFFLE application ready to run.
 
 ---
 
-# ⚙️ 4. Define Your Application Configuration
+# 🧰 3. Open the Project in VSCode
 
-Create:
+If you do not already have a preferred editor, we recommend **Visual Studio Code**.
 
-`internal/app/bootstrap/appconfig.go`
+Install:  
+https://code.visualstudio.com/
+
+Open the project in VSCode.
+
+Make sure you are **inside the project directory** (`hello`), then run:
+
+```bash
+code .
+```
+
+This opens the entire WAFFLE project in VSCode.
+
+---
+
+# ▶️ 4. Run Your WAFFLE App
+
+Start the service (still inside the `hello` directory):
+
+```bash
+go run ./cmd/hello
+```
+
+In a **web browser**, visit:
+
+```
+http://localhost:8080
+```
+
+In the browser window you should see:
+
+```
+Hello from WAFFLE!
+```
+
+🎉 **Success!**  
+You now have a functioning WAFFLE service.
+
+Now that you’ve seen it run, let’s explore the pieces WAFFLE generated.
+
+---
+
+# 🧭 4. Guided Tour of Your Generated WAFFLE Project
+
+What follows is a **tour** — you don’t need to edit anything yet.  
+This is just to build familiarity with the structure.
+
+---
+
+## ⚙️ 4.1 Application Configuration
+
+Open:
+
+```
+internal/app/bootstrap/appconfig.go
+```
+
+You’ll see:
 
 ```go
 package bootstrap
@@ -78,16 +135,25 @@ type AppConfig struct {
 }
 ```
 
-This struct holds application-specific configuration.  
-WAFFLE automatically loads **core** configuration; you define **your app’s** config as needed.
+**Purpose:**  
+This struct holds app‑specific configuration that *you* define.  
+WAFFLE loads core config automatically; your app config lives here.
+
+**When you’ll edit this:**  
+When you need custom values (e.g., app name, theme, feature toggles, etc.).
+
+**Optional deeper dive:**  
+[Examples of AppConfig patterns](./examples/appconfig_examples.md)
 
 ---
 
-# 🗄️ 5. Define Your Database Dependencies (Optional)
+## 🗄️ 4.2 Database / Backend Dependencies
 
-If your app doesn’t use a database yet, use a placeholder:
+Open:
 
-`internal/app/bootstrap/dbdeps.go`
+```
+internal/app/bootstrap/dbdeps.go
+```
 
 ```go
 package bootstrap
@@ -95,91 +161,71 @@ package bootstrap
 type DBDeps struct{}
 ```
 
-Later, DBDeps may include:
+**Purpose:**  
+`DBDeps` is where you place long-lived back-end dependencies:
 
-- *Mongo clients*
-- *SQL connections*
-- *Redis pools*
-- *AWS clients*
+- MongoDB clients  
+- SQL DB handles  
+- Redis connections  
+- AWS clients  
 - etc.
 
+Right now it’s empty — that’s fine.
+
+**When you’ll edit this:**  
+As soon as your app needs to talk to a database or external service.
+
+**Curious what this looks like?**  
+Examples:
+
+- [Using MongoDB with DBDeps](./examples/dbdeps_mongo.md)  
+- [Using Postgres with DBDeps](./examples/dbdeps_postgres.md)  
+- [Using Redis with DBDeps](./examples/dbdeps_redis.md)
+
 ---
 
-# 🔌 6. Implement Your WAFFLE Hooks
+## 🔌 4.3 WAFFLE Hooks (The Heart of Your App)
 
-Create:
+Open:
 
-`internal/app/bootstrap/hooks.go`
-
-```go
-package bootstrap
-
-import (
-    "context"
-    "net/http"
-
-    "github.com/dalemusser/waffle/app"
-    "github.com/dalemusser/waffle/config"
-    "github.com/go-chi/chi/v5"
-    "go.uber.org/zap"
-)
-
-func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
-    coreCfg, err := config.Load()
-    if err != nil {
-        return nil, AppConfig{}, err
-    }
-
-    appCfg := AppConfig{
-        Greeting: "Hello from WAFFLE!",
-    }
-
-    return coreCfg, appCfg, nil
-}
-
-func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) (DBDeps, error) {
-    return DBDeps{}, nil
-}
-
-func EnsureSchema(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
-    return nil
-}
-
-func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) (http.Handler, error) {
-    r := chi.NewRouter()
-
-    r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte(appCfg.Greeting))
-    })
-
-    return r, nil
-}
-
-var Hooks = app.Hooks[AppConfig, DBDeps]{
-    Name:         "hello-waffle",
-    LoadConfig:   LoadConfig,
-    ConnectDB:    ConnectDB,
-    EnsureSchema: EnsureSchema,
-    BuildHandler: BuildHandler,
-}
+```
+internal/app/bootstrap/hooks.go
 ```
 
-This file declares:
+This file wires your app into the WAFFLE lifecycle.
 
-- How config loads  
-- How DB connections are created  
-- How schema is prepared (optional)  
-- How routes and middleware are assembled  
+You’ll see the key pieces:
 
-These hooks are the glue between your application and the WAFFLE lifecycle.
+- `LoadConfig` – loads core + app config  
+- `ConnectDB` – connects your databases (empty for now)  
+- `EnsureSchema` – create indexes / bootstrap things (optional)  
+- `BuildHandler` – builds your HTTP router  
+- `Hooks{...}` – ties everything together
+
+Here is the important part:  
+**You don’t need to change anything yet.**
+
+But later, you’ll modify:
+
+- `ConnectDB` when adding Mongo/Postgres/etc.  
+- `BuildHandler` when adding routes  
+- `EnsureSchema` if you add schemas or indexes  
+
+**Want to peek at real examples?**
+
+- [MongoDB ConnectDB example](./examples/dbdeps_mongo.md)  
+- [Adding additional routes](./examples/routes_examples.md)  
+- [Using middleware in BuildHandler](./examples/middleware_examples.md)
 
 ---
 
-# 🚀 7. Create the WAFFLE Entry Point
+## 🚀 4.4 The WAFFLE Entry Point
 
-Create:
+Open:
 
-`cmd/hello/main.go`
+```
+cmd/hello/main.go
+```
 
 ```go
 package main
@@ -189,7 +235,7 @@ import (
     "log"
 
     "github.com/dalemusser/waffle/app"
-    "github.com/you/hello_waffle/internal/app/bootstrap"
+    "github.com/you/hello/internal/app/bootstrap"
 )
 
 func main() {
@@ -199,42 +245,40 @@ func main() {
 }
 ```
 
-This is all your `main.go` needs.  
-WAFFLE takes care of the lifecycle, logging, config, metrics, server startup, and graceful shutdown.
-
----
-
-# ▶️ 8. Run Your First WAFFLE App
-
-Start your service:
+In WAFFLE projects, runnable commands are placed under the `cmd/` directory.  
+Here, `cmd/hello/main.go` is the entry point for your service.  
+When you run:
 
 ```bash
 go run ./cmd/hello
 ```
 
-Visit:
+you are telling Go to run the `main.go` file inside the `cmd/hello` folder.
 
-```
-http://localhost:8080
-```
+This file:
 
-You should see:
+- Starts the WAFFLE lifecycle  
+- Loads config  
+- Connects databases  
+- Builds the router  
+- Starts HTTP/HTTPS servers  
+- Handles graceful shutdown  
 
-```
-Hello from WAFFLE!
-```
+You will rarely need to modify it.
 
 ---
 
-# 🧩 9. Add Routes (Your First Feature)
+# 🧩 5. Add a New Route (Your First Feature)
 
-Create a feature directory:
+Let’s actually add to your app now.
+
+Create a new directory:
 
 ```bash
 mkdir internal/app/features/about
 ```
 
-Add a handler:
+### Handler
 
 `internal/app/features/about/about.go`
 
@@ -248,7 +292,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Add routes:
+### Routes
 
 `internal/app/features/about/routes.go`
 
@@ -264,65 +308,109 @@ func Routes() chi.Router {
 }
 ```
 
-Mount feature routes in `BuildHandler`:
+### Register the route
+
+In `BuildHandler` in `hooks.go`:
 
 ```go
 r.Mount("/about", about.Routes())
 ```
 
----
+Now start the server again:
 
-# 🧰 10. Use the WAFFLE Toolkit (Optional Enhancements)
-
-### CORS Support
-
-```go
-import "github.com/dalemusser/waffle/toolkit/cors"
-r.Use(cors.Default())
+```
+go run ./cmd/hello
 ```
 
-### Windows Service Support
+In a **web browser**, visit:
+
+```
+http://localhost:8080/about
+```
+
+**Optional deeper dive:**  
+[Routes and Middleware Guide](./routes_and_middleware_guide.md)
+
+---
+
+# 🧰 6. Optional Enhancements (WAFFLE Toolkit)
+
+WAFFLE includes extra modules you can turn on when needed.
+
+---
+
+## 🌐 CORS Support
+
+To enable CORS:
+
+1. Open:
+
+   ```
+   internal/app/bootstrap/hooks.go
+   ```
+
+2. Add the import:
+
+   ```go
+   import "github.com/dalemusser/waffle/toolkit/cors"
+   ```
+
+3. Add the middleware **right after** creating the router:
+
+   ```go
+   r := chi.NewRouter()
+   r.Use(cors.Default())
+   ```
+
+More CORS examples:  
+[Advanced CORS patterns](./examples/cors_examples.md)
+
+---
+
+## 🪟 Windows Service Support
+
+Add:
 
 ```go
 import "github.com/dalemusser/waffle/toolkit/windowsservice"
 ```
 
-Build Windows-only `main_windows.go` using the WAFFLE adapter.
+Then create a Windows-only entry point (`main_windows.go`).  
+Example coming soon in the WAFFLE Examples section.
 
 ---
 
-# 🧱 11. Adding Real Functionality
+# 🧱 7. Adding Real Functionality
 
-You now have everything you need to build multilayered real apps:
+As your service grows:
 
-- Add Mongo or Postgres in `ConnectDB`  
-- Add schemas in `EnsureSchema`  
-- Add templates or JSON APIs in features  
-- Add rate limiting or middleware  
-- Add authentication  
-- Add scheduled tasks (triggered outside WAFFLE)  
+- Add Mongo/Postgres/Redis in `ConnectDB`
+- Prepare schemas in `EnsureSchema`
+- Add middleware in `BuildHandler`
+- Add templating or JSON APIs
+- Implement authentication
+- Add background jobs or cron (outside WAFFLE)
 
-WAFFLE is the structure. Your service is the flavor.
+WAFFLE handles the structure;  
+**you handle the flavor.**
 
 ---
 
 # 🎉 Congratulations!
 
-You've built your first WAFFLE service.  
-You’ve learned how to:
+You've built your first WAFFLE service and learned:
 
-- Scaffold a WAFFLE project  
-- Load configuration  
-- Connect databases  
-- Build routes  
-- Use toolkit helpers  
-- Run a real WAFFLE application  
-- Extend with additional features  
+- How WAFFLE apps are scaffolded  
+- How to run and explore your project  
+- How configuration, hooks, and routing work  
+- How to add features  
+- How to enable toolkit helpers  
+- Where to find deeper examples  
 
-From here, you’re ready to build complete WAFFLE-based systems such as:
+You now have everything you need to build full WAFFLE-powered systems such as:
 
 - **StrataHub**  
 - **StrataLog**  
-- **StrataSave**  
+- **StrataSave**
 
 Go build something delicious. 🧇🚀
