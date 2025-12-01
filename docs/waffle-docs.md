@@ -83,6 +83,3 @@ docs/
 - Need to integrate a database? → check **Database Integration** recipes  
 - Looking for patterns? → see **Configuration Patterns** and upcoming recipes
 
----
-
-If you’d like this document to include descriptions, tags, or links to code examples in `/examples/`, just let me know and we’ll expand it.
