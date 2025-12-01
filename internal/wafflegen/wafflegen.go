@@ -1,4 +1,3 @@
-// internal/wafflegen/wafflegen.go
 package wafflegen
 
 import (
@@ -45,6 +44,8 @@ func usage(binName string) {
 func newCmd(binName string, args []string) int {
 	fs := flag.NewFlagSet("new", flag.ExitOnError)
 	module := fs.String("module", "", "Go module path for the new app (e.g. github.com/you/hello_waffle)")
+	waffleVersion := fs.String("waffle-version", "", "Version of github.com/dalemusser/waffle to require in go.mod (e.g. v0.1.0)")
+	goVersion := fs.String("go-version", "1.21", "Go language version to declare in go.mod (e.g. 1.21)")
 	fs.Usage = func() {
 		fmt.Printf("Usage: %s new <appname> --module <module-path>\n", binName)
 		fs.PrintDefaults()
@@ -69,14 +70,14 @@ func newCmd(binName string, args []string) int {
 		return 1
 	}
 
-	if err := scaffoldApp(appName, *module); err != nil {
+	if err := scaffoldApp(appName, *module, *waffleVersion, *goVersion); err != nil {
 		log.Printf("scaffold failed: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-func scaffoldApp(appName, module string) error {
+func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
 	short := shortName(appName)
 
 	fmt.Printf("Creating WAFFLE app %q with module %q\n", appName, module)
@@ -92,7 +93,7 @@ func scaffoldApp(appName, module string) error {
 	}
 
 	// go.mod
-	if err := os.WriteFile(join("go.mod"), []byte(goModContent(module)), 0o644); err != nil {
+	if err := os.WriteFile(join("go.mod"), []byte(goModContent(module, waffleVersion, goVersion)), 0o644); err != nil {
 		return fmt.Errorf("write go.mod: %w", err)
 	}
 
@@ -148,12 +149,26 @@ func shortName(appName string) string {
 	return strings.ReplaceAll(s, " ", "_")
 }
 
-func goModContent(module string) string {
-	// Leave WAFFLE and other deps to go get / go mod tidy
+func goModContent(module, waffleVersion, goVersion string) string {
+	if goVersion == "" {
+		goVersion = "1.21"
+	}
+
+	// If a WAFFLE version is provided, include it as a require line.
+	if waffleVersion != "" {
+		return fmt.Sprintf(`module %s
+
+go %s
+
+require github.com/dalemusser/waffle %s
+`, module, goVersion, waffleVersion)
+	}
+
+	// Default: leave WAFFLE and other deps to go get / go mod tidy.
 	return fmt.Sprintf(`module %s
 
-go 1.23
-`, module)
+go %s
+`, module, goVersion)
 }
 
 func mainGoContent(module, short string) string {
