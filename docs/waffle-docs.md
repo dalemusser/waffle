@@ -39,9 +39,11 @@ All live under `docs/examples/`.
 - **[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)**
 - **[CORS Examples](./examples/cors-examples.md)**
 - **[DBDeps Usage Examples](./examples/dbdeps-usage-examples.md)**
+- **[Feature Structure Examples](./examples/feature-structure-examples.md)**
 - **[Handler Structure Examples](./examples/handler-structure-examples.md)**
 - **[Middleware Examples](./examples/middleware-examples.md)**
 - **[Route Examples](./examples/routes-examples.md)**
+- **[Windows Service Examples](./examples/windows-service-examples.md)**
 
 ### **(Reserved for future examples — see to‑do list)**
 - Migrations (`golang-migrate`)
@@ -72,9 +74,11 @@ docs/
 │   ├── dbdeps-postgres-pgxpool.md
 │   ├── dbdeps-redis.md
 │   ├── dbdeps-usage-examples.md
+│   ├── feature-structure-examples.md
 │   ├── handler-structure-examples.md
 │   ├── middleware-examples.md
 │   ├── routes-examples.md
+│   ├── windows-service-examples.md
 │   └── examples-of-appconfig-patterns.md
 │
 └── to-do/

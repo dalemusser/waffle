@@ -26,6 +26,9 @@ A list of documentation topics, guides, and example pages to create in future pa
 - **Chained custom middleware examples**
 - **Advanced DBDeps struct organization**
 - **Role-based routing examples**
+- **Logging Windows service lifecycle events**
+- **Combining Windows service execution with DBDeps cleanup**
+- **Packaging WAFFLE apps for Windows distribution**
 
 ## Notes
 This file tracks ideas we do not want to lose while focusing on top‑level documentation first.

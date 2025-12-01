@@ -63,6 +63,12 @@ func newCmd(binName string, args []string) int {
 	}
 
 	appName := fs.Arg(0)
+	if err := validateAppName(appName); err != nil {
+		fmt.Println("error:", err.Error())
+		fmt.Println()
+		fs.Usage()
+		return 1
+	}
 	if *module == "" {
 		fmt.Println("error: --module is required")
 		fmt.Println()
@@ -78,7 +84,7 @@ func newCmd(binName string, args []string) int {
 }
 
 func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
-	short := shortName(appName)
+	short := appBaseName(appName)
 
 	fmt.Printf("Creating WAFFLE app %q with module %q\n", appName, module)
 
@@ -140,13 +146,42 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
 	return nil
 }
 
-func shortName(appName string) string {
-	// Basic heuristic: last path element, replace spaces with underscores
+func appBaseName(appName string) string {
+	// Extract the last path element from the provided app name.
+	// This is used for things like the cmd/<name> directory and Hooks.Name.
 	s := appName
 	if i := strings.LastIndex(appName, "/"); i >= 0 {
 		s = appName[i+1:]
 	}
-	return strings.ReplaceAll(s, " ", "_")
+	return s
+}
+
+func validateAppName(name string) error {
+	// Consider only the last path element as the actual app name
+	s := name
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		s = name[i+1:]
+	}
+
+	if s == "" {
+		return fmt.Errorf("app name cannot be empty")
+	}
+
+	for i, r := range s {
+		// allow letters, digits, and underscore
+		if !((r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_') {
+			return fmt.Errorf("app name %q contains invalid character %q; only letters, digits, and underscore are allowed", name, r)
+		}
+		// do not allow starting with a digit
+		if i == 0 && (r >= '0' && r <= '9') {
+			return fmt.Errorf("app name %q cannot start with a digit", name)
+		}
+	}
+
+	return nil
 }
 
 func goModContent(module, waffleVersion, goVersion string) string {
@@ -211,7 +246,7 @@ type DBDeps struct{}
 }
 
 func hooksContent(appName string) string {
-	name := shortName(appName)
+	name := appBaseName(appName)
 
 	const tpl = `package bootstrap
 
