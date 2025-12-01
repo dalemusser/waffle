@@ -42,6 +42,42 @@ We *really* believe in [**Go**](https://go.dev/).
 - **L**ayered
 - **E**ngineering
 
+---
+
+## 📚 Documentation
+
+- **[How to Write Your First WAFFLE Service](docs/first-waffle-service-howto.md)**
+- **[WAFFLE Quickstart Guide](docs/quickstart-guide.md)**
+- **[WAFFLE Framework – Developer Documentation](docs/developer-documentation.md)**
+- **[WAFFLE Routes & Middleware Guide](docs/routes-and-middleware-guide.md)**
+- **[Examples](docs/examples/)** — AppConfig patterns, database integration, routes, middleware, and more
+
+---
+
+## 🚀 Try WAFFLE
+
+Install the WAFFLE CLI:
+
+```bash
+go install github.com/dalemusser/waffle/cmd/makewaffle@latest
+```
+
+Create a new project:
+
+```bash
+makewaffle new hello \
+  --module github.com/you/hello
+```
+
+Run your service:
+
+```bash
+cd hello
+go run ./cmd/hello
+```
+
+---
+
 ### 🧇 Go Get WAFFLE
 
 [**Go**](https://go.dev/) install it. [**Go**](https://go.dev/) scaffold your app. [**Go**](https://go.dev/) route your requests. [**Go**](https://go.dev/) layer your logic. [**Go**](https://go.dev/) serve your stack. [**Go**](https://go.dev/) build something delicious.

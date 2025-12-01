@@ -143,7 +143,7 @@ WAFFLE loads core config automatically; your app config lives here.
 When you need custom values (e.g., app name, theme, feature toggles, etc.).
 
 **Optional deeper dive:**  
-[Examples of AppConfig patterns](./examples/appconfig_examples.md)
+[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)
 
 ---
 
@@ -329,7 +329,7 @@ http://localhost:8080/about
 ```
 
 **Optional deeper dive:**  
-[Routes and Middleware Guide](./routes_and_middleware_guide.md)
+[Routes and Middleware Guide](./routes-and-middleware-guide.md)
 
 ---
 
