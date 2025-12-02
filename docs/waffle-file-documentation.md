@@ -197,7 +197,7 @@ Groups HTTP/HTTPS port and protocol settings.
 
 | Field | Type | Mapstructure | Description |
 |-------|------|--------------|-------------|
-| `HTTPPort` | `int` | `http_port` | HTTP port (default: 80) |
+| `HTTPPort` | `int` | `http_port` | HTTP port (default: 8080) |
 | `HTTPSPort` | `int` | `https_port` | HTTPS port (default: 443) |
 | `UseHTTPS` | `bool` | `use_https` | Enable HTTPS |
 
@@ -274,7 +274,7 @@ All settings can be configured via environment variables with the `WAFFLE_` pref
 |----------|---------|-------------|
 | `WAFFLE_ENV` | `dev` | Runtime environment |
 | `WAFFLE_LOG_LEVEL` | `debug` | Log level |
-| `WAFFLE_HTTP_PORT` | `80` | HTTP port |
+| `WAFFLE_HTTP_PORT` | `8080` | HTTP port |
 | `WAFFLE_HTTPS_PORT` | `443` | HTTPS port |
 | `WAFFLE_USE_HTTPS` | `false` | Enable HTTPS |
 | `WAFFLE_USE_LETS_ENCRYPT` | `false` | Use Let's Encrypt |

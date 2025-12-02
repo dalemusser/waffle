@@ -36,26 +36,29 @@ This Quickstart gets you from zero → running WAFFLE service in minutes.
 
 # 🧇 1. Install WAFFLE
 
-Install core WAFFLE modules:
-
-```bash
-go get github.com/dalemusser/waffle
-```
-
-Install the CLI so you can scaffold new apps:
+Install the WAFFLE CLI so you can scaffold new apps:
 
 ```bash
 go install github.com/dalemusser/waffle/cmd/makewaffle@latest
 ```
 
-If you prefer industry-standard naming conventions, you may also use:
+This installs the `makewaffle` command and downloads the WAFFLE module into your Go toolchain. When you later run `go mod tidy` in your generated project, Go will automatically add `github.com/dalemusser/waffle` to your `go.mod`.
+
+Make sure your Go bin directory (often `~/go/bin`) is on your `PATH` so you can run `makewaffle` from the terminal.
+
+If you prefer an industry-standard CLI name, you can install `wafflectl` instead:
 
 ```bash
 go install github.com/dalemusser/waffle/cmd/wafflectl@latest
 ```
 
-Both commands work the same.  
-This guide uses **makewaffle**.
+If you only want to use WAFFLE as a library in an existing Go module (without the CLI), you can add it with:
+
+```bash
+go get github.com/dalemusser/waffle@latest
+```
+
+This quickstart assumes you have installed the CLI as `makewaffle`.
 
 ---
 
@@ -90,11 +93,36 @@ cd myservice
 go mod tidy
 ```
 
-Open it in VSCode:
+Run the app:
+
+```
+go run ./cmd/myservice
+```
+
+Visit WAFFLE’s default address (port 8080):
+
+```
+http://localhost:8080
+```
+
+You should see:
+
+```
+Hello from WAFFLE!
+```
+
+Open it in VSCode inside the `myservice` directory:
 
 ```bash
 code .
 ```
+
+Note: WAFFLE’s default port (http_port) is 8080.
+
+You can override it with:
+
+- CLI flag → --http_port=9090
+- Env var → WAFFLE_HTTP_PORT=9090
 
 ---
 
@@ -187,27 +215,7 @@ Learn how it all connects:
 
 ---
 
-# 🚀 5. Run the App
-
-```bash
-go run ./cmd/myservice
-```
-
-Visit:
-
-```
-http://localhost:8080
-```
-
-You should see:
-
-```
-Hello from WAFFLE!
-```
-
----
-
-# 🛣️ 6. Add a Feature
+# 🛣️ 5. Add a Feature
 
 ### Handler → Routes → BuildHandler Diagram
 
@@ -281,7 +289,7 @@ Visit:
 
 ---
 
-# 🍯 7. Use Toolkit Helpers
+# 🍯 6. Use Toolkit Helpers
 
 WAFFLE Toolkit modules live under `waffle/toolkit/`.
 
@@ -307,7 +315,7 @@ See full example:
 
 ---
 
-# 🧱 8. Configuration for Real Deployments
+# 🧱 7. Configuration for Real Deployments
 
 WAFFLE supports TOML, YAML, JSON, environment variables, and CLI flags.
 
@@ -317,7 +325,7 @@ Full configuration reference:
 
 ---
 
-# 💡 9. Best Practices
+# 💡 8. Best Practices
 
 - Keep domain logic in `internal/domain/models`
 - Keep persistence in `internal/app/store`
@@ -327,7 +335,7 @@ Full configuration reference:
 
 ---
 
-# 🧇 10. What to Build Next
+# 🧇 9. What to Build Next
 
 Explore deeper topics:
 

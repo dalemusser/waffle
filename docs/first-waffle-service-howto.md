@@ -88,22 +88,7 @@ You now have a complete WAFFLE project skeleton created by the CLI.
 
 ---
 
-# 🧰 3. Open the Project in VSCode
-
-If you do not already have a preferred editor, install VSCode:
-
-https://code.visualstudio.com/
-
-Open the project.  
-Make sure you are in the `hello` directory, then run:
-
-```bash
-code .
-```
-
----
-
-# ▶️ 4. Run Your WAFFLE App
+# ▶️ 3. Run Your WAFFLE App
 
 Start your new service:
 
@@ -125,7 +110,20 @@ Hello from WAFFLE!
 
 🎉 **Your first WAFFLE app is running.**
 
-Now let’s understand the structure behind it.
+---
+
+# 🧰 4. Open the Project in VSCode
+
+If you do not already have a preferred editor, install VSCode:
+
+https://code.visualstudio.com/
+
+Open the project.  
+Make sure you are in the `hello` directory, then run:
+
+```bash
+code .
+```
 
 ---
 

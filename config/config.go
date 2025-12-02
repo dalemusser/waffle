@@ -102,7 +102,7 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	pflag.String("env", "dev", `Runtime environment "dev"|"prod"`)
 	pflag.String("log_level", "debug", "Log level")
 
-	pflag.Int("http_port", 80, "HTTP port")
+	pflag.Int("http_port", 8080, "HTTP port")
 	pflag.Int("https_port", 443, "HTTPS port")
 	pflag.Bool("use_https", false, "Serve HTTPS")
 
@@ -240,7 +240,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("env", "dev")
 	v.SetDefault("log_level", "debug")
 
-	v.SetDefault("http_port", 80)
+	v.SetDefault("http_port", 8080)
 	v.SetDefault("https_port", 443)
 	v.SetDefault("use_https", false)
 

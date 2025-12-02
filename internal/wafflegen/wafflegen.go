@@ -162,6 +162,7 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
 	fmt.Printf("  cd %s\n", appName)
 	fmt.Println("  go mod tidy")
 	fmt.Printf("  go run ./cmd/%s\n", short)
+	fmt.Println("  go to http://localhost:8080 in web browser")
 	fmt.Println()
 	return nil
 }
