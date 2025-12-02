@@ -75,10 +75,10 @@ CLI flags ───┘                  → AppConfig
 ## Mermaid
 ```mermaid
 flowchart LR
-    A[AppConfig + DBDeps + Logger] --> B[Feature Handler]
-    B --> C[Feature Routes(h)]
-    C --> D[BuildHandler mounts subrouters]
-    D --> E[chi.Router]
+    A["AppConfig + DBDeps + Logger"] --> B["Feature Handler"]
+    B --> C["Feature Routes(h)"]
+    C --> D["BuildHandler mounts subrouters"]
+    D --> E["chi.Router"]
 ```
 
 ## ASCII
@@ -102,10 +102,10 @@ AppConfig + DBDeps + Logger
 ## Mermaid
 ```mermaid
 flowchart TD
-    A[features/xyz] --> B[handler.go]
-    A --> C[routes.go]
-    A --> D[templates/ (optional)]
-    A --> E[service.go (optional)]
+    A["features/xyz"] --> B["handler.go"]
+    A --> C["routes.go"]
+    A --> D["templates/ (optional)"]
+    A --> E["service.go (optional)"]
 ```
 
 ## ASCII
@@ -155,11 +155,11 @@ Response
 ## Mermaid
 ```mermaid
 flowchart TD
-    A[use_https=true] --> B{use_lets_encrypt?}
-    B -- yes --> C[ACME (http-01 or dns-01)]
-    C --> D[Certificate Cache]
-    B -- no --> E[Manual cert_file + key_file]
-    D --> F[HTTPS Server on https_port]
+    A["use_https = true"] --> B{"use_lets_encrypt?"}
+    B -- "yes" --> C["ACME http-01 or dns-01"]
+    C --> D["Certificate cache"]
+    B -- "no" --> E["Manual cert_file and key_file"]
+    D --> F["HTTPS server on https_port"]
     E --> F
 ```
 
