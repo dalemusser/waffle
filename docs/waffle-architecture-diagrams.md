@@ -116,7 +116,6 @@ This diagram explains how WAFFLE wires HTTP behavior together.
 - **BuildHandler** mounts each feature’s subrouter at a top‑level path.  
 - The final **chi.Router** is the complete routing graph passed to the server.  
 This structure allows WAFFLE to remain explicit, testable, and easy to reason about.
-```
 
 ---
 
@@ -147,7 +146,6 @@ Each feature lives in its own folder under `internal/app/features/...`.
 - `templates/` may include HTMX/Tailwind partials.  
 - `service.go` is optional and holds internal feature logic.  
 This pattern keeps code isolated, modular, and discoverable.
-```
 
 ---
 
@@ -185,7 +183,6 @@ This diagram shows what happens when WAFFLE receives an HTTP request.
 - The router dispatches to the correct handler method.  
 - The handler writes a response using only explicit dependencies.  
 This predictable path makes debugging and performance tuning easier.
-```
 
 ---
 
@@ -224,7 +221,6 @@ WAFFLE supports both manual TLS and automatic Let’s Encrypt.
 - When **manual TLS** is used, you provide `cert_file` and `key_file`.  
 - In both cases, WAFFLE launches the HTTPS server once certificates are ready.  
 This design avoids complexity for developers while supporting secure deployments.
-```
 
 ---
 
@@ -260,7 +256,6 @@ The toolkit provides optional helpers that fit naturally into the middleware cha
 - `cors` injects CORS headers and preflight handling.  
 - `windowsservice` adapts WAFFLE to the Windows Service Control Manager.  
 Because toolkit modules are middleware, they compose cleanly with features and routing without adding framework complexity.
-```
 
 ---
 
@@ -302,7 +297,6 @@ This directory layout is produced automatically by `makewaffle`.
 - `store/` holds persistence code.  
 - `domain/models/` defines your business entities.  
 This structure ensures consistency across all WAFFLE‑based services.
-```
 
 ---
 
