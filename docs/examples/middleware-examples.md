@@ -1,10 +1,23 @@
-
-
 # Middleware Examples  
 *Practical patterns for adding and using middleware in WAFFLE applications.*
 
 WAFFLE uses Chi under the hood, which makes middleware composition easy and predictable.  
 These examples show how to apply middleware at the **application level**, **feature level**, **route group level**, and **per-route level**.
+
+### WAFFLE Middleware Chain Diagram
+
+```mermaid
+flowchart LR
+    A["Incoming Request"] --> B["App‑Wide Middleware<br/>(BuildHandler)"]
+    B --> C["Feature‑Level Middleware<br/>(Routes)"]
+    C --> D["Sub‑Group Middleware<br/>(r.Group)"]
+    D --> E["Per‑Route Middleware<br/>(r.With)"]
+    E --> F["Handler Method"]
+    F --> G["Response"]
+```
+
+See the full architectural context in  
+[Request Flow Through WAFFLE](../waffle-architecture-diagrams.md#-request-flow-through-waffle).
 
 All examples follow the standard WAFFLE file structure:
 
@@ -131,7 +144,7 @@ func Routes() chi.Router {
     r.Group(func(pr chi.Router) {
         pr.Use(auth.RequireAuth)
 
-        pr.Get("/settings", UserSettings)
+        r.Get("/settings", UserSettings)
 
         // Admin-only area
         pr.Group(func(ar chi.Router) {
