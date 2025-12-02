@@ -8,7 +8,21 @@ This document focuses on **how to use DBDeps inside routes, handlers, and featur
 
 ---
 
+
 # 🧱 1. Passing DBDeps Into a Feature Handler
+
+### DBDeps Flow Diagram
+
+```mermaid
+flowchart LR
+    A["ConnectDB (in Hooks)"] --> B["DBDeps struct"]
+    B --> C["Feature Handler"]
+    C --> D["Handler Methods"]
+    D --> E["Database / Cache / Backend Operations"]
+```
+
+See the full architectural context in  
+[WAFFLE Lifecycle](../waffle-architecture-diagrams.md#-waffle-lifecycle).
 
 A common and recommended pattern is to construct handlers that store DBDeps.
 
