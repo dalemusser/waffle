@@ -30,7 +30,21 @@ func Routes() chi.Router {
 }
 ```
 
+
 This “composition model” keeps features self-contained while leaving URL layout to the top level.
+
+### WAFFLE Routing Diagram
+
+```mermaid
+flowchart LR
+    A["Top‑level BuildHandler"] --> B["r.Mount('/about', about.Routes())"]
+    B --> C["Feature Routes()"]
+    C --> D["chi.Subrouter"]
+    D --> E["Handler Methods"]
+```
+
+See also the more detailed version in  
+[Handler / Routes / BuildHandler Relationship](./waffle-architecture-diagrams.md#-handler--routes--buildhandler-relationship).
 
 ---
 
