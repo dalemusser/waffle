@@ -15,6 +15,9 @@ Use it as your starting point when exploring or contributing to WAFFLE docs.
 - **[WAFFLE Quickstart Guide](./quickstart-guide.md)**  
   A concise, practical overview for developers who want the fastest path to productivity.
 
+- **[WAFFLE Documentation Creation Guidelines](./about_document_creation.md)**  
+  Standards and principles for writing clear, connected, and architectural WAFFLE documentation.
+
 ### **2. Core Framework Concepts**
 - **[WAFFLE Framework – Developer Documentation](./developer-documentation.md)**  
   Deep dive into WAFFLE’s architecture, lifecycle, configuration, logging, server behavior, and middleware.
@@ -37,6 +40,8 @@ All live under `docs/examples/`.
 
 ### **Configuration Patterns**
 - **[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)**
+- **[WAFFLE Configuration Overview](./examples/about_waffle_config.md)**
+- **[WAFFLE Provided Configuration Variables](./examples/waffle-provided-config-vars.md)**
 - **[CORS Examples](./examples/cors-examples.md)**
 - **[DBDeps Usage Examples](./examples/dbdeps-usage-examples.md)**
 - **[Feature Structure Examples](./examples/feature-structure-examples.md)**
@@ -67,19 +72,22 @@ docs/
 ├── first-waffle-service-howto.md
 ├── quickstart-guide.md
 ├── routes-and-middleware-guide.md
+├── about_document_creation.md
 │
 ├── examples/
+│   ├── about_waffle_config.md
 │   ├── dbdeps-mongo.md
 │   ├── dbdeps-postgres.md
 │   ├── dbdeps-postgres-pgxpool.md
 │   ├── dbdeps-redis.md
 │   ├── dbdeps-usage-examples.md
+│   ├── example-of-appconfig-patterns.md
 │   ├── feature-structure-examples.md
 │   ├── handler-structure-examples.md
 │   ├── middleware-examples.md
 │   ├── routes-examples.md
-│   ├── windows-service-examples.md
-│   └── examples-of-appconfig-patterns.md
+│   ├── waffle-provided-config-vars.md
+│   └── windows-service-examples.md
 │
 └── to-do/
     └── to-do.md

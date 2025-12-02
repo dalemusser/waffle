@@ -4,6 +4,7 @@ A list of documentation topics, guides, and example pages to create in future pa
 
 ## 📚 Future Documentation & Example Topics
 
+- **Configuration scenarios** (Let's Encrypt http-01, dns-01 with Route53, local dev without HTTPS, behind reverse proxy)
 - **Migrations setup** (e.g., using `golang-migrate/migrate`)
 - **Multiple databases in one DBDeps**
 - **Testing DBDeps with mocks / dependency injection**
