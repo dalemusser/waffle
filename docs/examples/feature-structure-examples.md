@@ -18,7 +18,18 @@ internal/app/features/items/
     service.go       — optional: business logic unrelated to HTTP
 ```
 
-This structure keeps each feature self-contained and easy to understand.
+### Feature Folder Structure Diagram
+
+```mermaid
+flowchart TD
+    A["features/items"] --> B["handler.go"]
+    A --> C["routes.go"]
+    A --> D["model.go (optional)"]
+    A --> E["service.go (optional)"]
+```
+
+See the full diagram in  
+[Feature Folder Structure](../waffle-architecture-diagrams.md#-feature-folder-structure).
 
 ---
 
