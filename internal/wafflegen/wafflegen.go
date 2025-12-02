@@ -50,19 +50,39 @@ func newCmd(binName string, args []string) int {
 		fmt.Printf("Usage: %s new <appname> --module <module-path>\n", binName)
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+
+	// Split args into flag arguments and positional arguments so flags
+	// can appear before or after the app name.
+	var flagArgs []string
+	var posArgs []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			flagArgs = append(flagArgs, a)
+			// If this flag takes a value and the next arg is not another flag,
+			// include it as part of the flag args.
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				flagArgs = append(flagArgs, args[i+1])
+				i++
+			}
+		} else {
+			posArgs = append(posArgs, a)
+		}
+	}
+
+	if err := fs.Parse(flagArgs); err != nil {
 		log.Println("parse flags:", err)
 		return 1
 	}
 
-	if fs.NArg() < 1 {
+	if len(posArgs) < 1 {
 		fmt.Println("error: appname is required")
 		fmt.Println()
 		fs.Usage()
 		return 1
 	}
 
-	appName := fs.Arg(0)
+	appName := posArgs[0]
 	if err := validateAppName(appName); err != nil {
 		fmt.Println("error:", err.Error())
 		fmt.Println()
@@ -140,7 +160,7 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  cd %s\n", appName)
-	fmt.Println("  go get github.com/dalemusser/waffle github.com/go-chi/chi/v5 go.uber.org/zap")
+	fmt.Println("  go mod tidy")
 	fmt.Printf("  go run ./cmd/%s\n", short)
 	fmt.Println()
 	return nil
