@@ -305,7 +305,7 @@ This structure ensures consistency across all WAFFLE‑based services.
 You may deep‑link to any diagram heading using GitHub’s anchor format, e.g.:
 
 ```markdown
-See the [WAFFLE Lifecycle](../waffle-architecture-diagrams.md#waffle-lifecycle) diagram.
+See the [WAFFLE Lifecycle](./waffle-architecture-diagrams.md#-waffle-lifecycle) diagram.
 ```
 
 Each heading in this file is intentionally stable and anchor-safe.

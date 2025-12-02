@@ -161,7 +161,19 @@ Chi Router
 HTTP Server (single Go binary)
 ```
 
-Every file you encounter participates in this flow.
+### WAFFLE Lifecycle Diagram
+
+```mermaid
+flowchart TD
+    A["LoadConfig"] --> B["ConnectDB (DBDeps)"]
+    B --> C["EnsureSchema (optional)"]
+    C --> D["BuildHandler (construct feature handlers)"]
+    D --> E["Routes(h)"]
+    E --> F["chi.Router"]
+    F --> G["HTTP Server"]
+```
+
+See also the [WAFFLE Lifecycle](./waffle-architecture-diagrams.md#-waffle-lifecycle) diagram in the Architecture Diagrams reference.
 
 ---
 
@@ -370,6 +382,19 @@ http://localhost:8080/about
 ```
 
 Success!
+
+### Handler → Routes → BuildHandler Diagram
+
+```mermaid
+flowchart LR
+    A["AppConfig + DBDeps + Logger"] --> B["Feature Handler"]
+    B --> C["Feature Routes(h)"]
+    C --> D["BuildHandler mounts '/about'"]
+    D --> E["chi.Router"]
+```
+
+See the detailed version in  
+[Handler / Routes / BuildHandler Relationship](./waffle-architecture-diagrams.md#-handler--routes--buildhandler-relationship).
 
 ---
 
