@@ -23,7 +23,22 @@ Everything here applies to all WAFFLE applications.
 
 ---
 
+
 # 🧱 1. WAFFLE Configuration Sources
+
+### WAFFLE Configuration Flow Diagram
+
+```mermaid
+flowchart LR
+    A["config.toml / config.yaml / config.json"] --> D["Viper Loader"]
+    B["Environment Variables (WAFFLE_*)"] --> D
+    C["Command-Line Flags"] --> D
+    D --> E["CoreConfig"]
+    D --> F["AppConfig"]
+```
+
+See also the full version in  
+[Configuration Flow](../waffle-architecture-diagrams.md#-configuration-flow).
 
 By default, configuration may come from three places:
 
