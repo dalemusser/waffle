@@ -4,6 +4,19 @@
 These examples show **concrete, minimal code** for adding routes inside a feature
 using WAFFLE’s recommended **subrouter + Mount** model.
 
+### Routing Diagram: Subrouter + Mount
+
+```mermaid
+flowchart LR
+    A["Feature Routes()"] --> B["chi.Subrouter"]
+    B --> C["Mounted with r.Mount('/path', Routes())"]
+    C --> D["Final chi.Router"]
+    D --> E["Incoming Requests Routed to Handler Functions"]
+```
+
+For a broader architectural view, see the  
+[Handler / Routes / BuildHandler Relationship](../waffle-architecture-diagrams.md#-handler--routes--buildhandler-relationship) diagram.
+
 All examples follow this file structure:
 
 ```
