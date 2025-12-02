@@ -282,7 +282,7 @@ import (
 
 // LoadConfig loads WAFFLE core config and app-specific config.
 func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
-    coreCfg, err := config.Load()
+    coreCfg, err := config.Load(logger)
     if err != nil {
         return nil, AppConfig{}, err
     }
