@@ -76,7 +76,7 @@ flowchart TD
 ```
 
 For more detail, see the  
-[WAFFLE Lifecycle](./waffle-architecture-diagrams.md#waffle-lifecycle) diagram.
+[WAFFLE Lifecycle](./waffle-architecture-diagrams.md#-waffle-lifecycle) diagram.
 
 ### 3.1 Hooks
 
@@ -204,7 +204,7 @@ flowchart LR
 ```
 
 See also the  
-[Handler / Routes / BuildHandler Relationship](./waffle-architecture-diagrams.md#handler--routes--buildhandler-relationship) diagram.
+[Handler / Routes / BuildHandler Relationship](./waffle-architecture-diagrams.md#-handler--routes--buildhandler-relationship) diagram.
 
 ---
 
