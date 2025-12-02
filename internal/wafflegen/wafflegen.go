@@ -42,6 +42,7 @@ func usage(binName string) {
 }
 
 func newCmd(binName string, args []string) int {
+	log.Printf("DEBUG newCmd args=%q", args)
 	fs := flag.NewFlagSet("new", flag.ExitOnError)
 	module := fs.String("module", "", "Go module path for the new app (e.g. github.com/you/hello_waffle)")
 	waffleVersion := fs.String("waffle-version", "", "Version of github.com/dalemusser/waffle to require in go.mod (e.g. v0.1.0)")
@@ -69,11 +70,13 @@ func newCmd(binName string, args []string) int {
 			posArgs = append(posArgs, a)
 		}
 	}
+	log.Printf("DEBUG split flagArgs=%q posArgs=%q", flagArgs, posArgs)
 
 	if err := fs.Parse(flagArgs); err != nil {
 		log.Println("parse flags:", err)
 		return 1
 	}
+	log.Printf("DEBUG after Parse: module=%q", *module)
 
 	if len(posArgs) < 1 {
 		fmt.Println("error: appname is required")
