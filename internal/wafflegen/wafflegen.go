@@ -271,27 +271,27 @@ func hooksContent(appName string) string {
 	const tpl = `package bootstrap
 
 import (
-	"context"
-	"net/http"
+    "context"
+    "net/http"
 
-	"github.com/dalemusser/waffle/app"
-	"github.com/dalemusser/waffle/config"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
+    "github.com/dalemusser/waffle/app"
+    "github.com/dalemusser/waffle/config"
+    "github.com/go-chi/chi/v5"
+    "go.uber.org/zap"
 )
 
 // LoadConfig loads WAFFLE core config and app-specific config.
 func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
-	coreCfg, err := config.Load()
-	if err != nil {
-		return nil, AppConfig{}, err
-	}
+    coreCfg, err := config.Load()
+    if err != nil {
+        return nil, AppConfig{}, err
+    }
 
-	appCfg := AppConfig{
-		Greeting: "Hello from WAFFLE!",
-	}
+    appCfg := AppConfig{
+        Greeting: "Hello from WAFFLE!",
+    }
 
-	return coreCfg, appCfg, nil
+    return coreCfg, appCfg, nil
 }
 
 // ConnectDB connects to databases or other backends.
