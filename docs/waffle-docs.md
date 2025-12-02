@@ -25,6 +25,9 @@ Use it as your starting point when exploring or contributing to WAFFLE docs.
 - **[WAFFLE Routes & Middleware Guide](./routes-and-middleware-guide.md)**  
   A conceptual + practical guide to routing patterns, subrouters, middleware, and feature composition.
 
+- **[WAFFLE Architecture Diagrams](./waffle-architecture-diagrams.md)**  
+  Visual diagrams of WAFFLE’s lifecycle, routing, configuration flow, TLS behavior, and feature structure.
+
 ---
 
 # 🧩 Example Library (Recipes)
@@ -72,6 +75,7 @@ docs/
 ├── first-waffle-service-howto.md
 ├── quickstart-guide.md
 ├── routes-and-middleware-guide.md
+├── waffle-architecture-diagrams.md
 ├── about_document_creation.md
 │
 ├── examples/
