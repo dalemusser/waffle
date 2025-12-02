@@ -4,6 +4,23 @@
 WAFFLE includes optional support for running applications as native Windows Services.  
 This document shows how to structure your project and create the Windows-only entry point needed to support service installation and execution.
 
+### Windows Service Entry Structure Diagram
+
+```mermaid
+flowchart TD
+    A["Windows Build"] --> B["main_windows.go<br/>(windowsservice.Run)"]
+    A2["Non-Windows Build"] --> C["main.go<br/>(app.Run)"]
+
+    B --> D["WAFFLE Lifecycle"]
+    C --> D
+
+    D --> E["HTTP/HTTPS Server"]
+```
+
+This diagram shows how WAFFLE selects the correct entry point on Windows vs. Linux/macOS.  
+See also the full architecture in  
+[WAFFLE Lifecycle](../waffle-architecture-diagrams.md#-waffle-lifecycle).
+
 ---
 
 # 🧱 1. Install the Windows Service Toolkit
@@ -162,5 +179,3 @@ This example showed how to:
 4. Maintain proper graceful shutdown behavior  
 
 This pattern keeps Windows-specific logic isolated while letting the rest of the WAFFLE application remain fully cross-platform.
-
-
