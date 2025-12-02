@@ -114,6 +114,19 @@ BuildHandler → constructs feature handlers + routes
 Start HTTP server (single Go binary)
 ```
 
+### WAFFLE Lifecycle Diagram
+
+```mermaid
+flowchart TD
+    A["LoadConfig"] --> B["ConnectDB (DBDeps)"]
+    B --> C["EnsureSchema (optional)"]
+    C --> D["BuildHandler (constructs feature handlers + routes)"]
+    D --> E["Start HTTP server"]
+```
+
+See also the  
+[WAFFLE Lifecycle](./waffle-architecture-diagrams.md#-waffle-lifecycle) diagram in the architecture reference.
+
 If this is unfamiliar, read the  
 **[WAFFLE Documentation Creation Guidelines](./about_document_creation.md)**  
 which explains the philosophy behind WAFFLE docs.
@@ -195,6 +208,19 @@ Hello from WAFFLE!
 ---
 
 # 🛣️ 6. Add a Feature
+
+### Handler → Routes → BuildHandler Diagram
+
+```mermaid
+flowchart LR
+    A["AppConfig + DBDeps + Logger"] --> B["Feature Handler"]
+    B --> C["Feature Routes(h)"]
+    C --> D["Mounted in BuildHandler"]
+    D --> E["chi.Router"]
+```
+
+For the full version, see the  
+[Handler / Routes / BuildHandler Relationship](./waffle-architecture-diagrams.md#-handler--routes--buildhandler-relationship) diagram.
 
 Create:
 
