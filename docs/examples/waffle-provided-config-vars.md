@@ -13,6 +13,20 @@ This document complements the broader configuration overview in
 
 ---
 
+### WAFFLE Configuration Flow Diagram
+
+```mermaid
+flowchart LR
+    A["config.toml / config.yaml / config.json"] --> D["Viper Loader"]
+    B["Environment Variables (WAFFLE_*)"] --> D
+    C["Command-Line Flags"] --> D
+    D --> E["CoreConfig"]
+    D --> F["AppConfig"]
+```
+
+See the full diagram in  
+[Configuration Flow](../waffle-architecture-diagrams.md#-configuration-flow).
+
 # 🧇 Table of All WAFFLE CoreConfig Variables  
 *A concise, at‑a‑glance reference.*
 
