@@ -45,6 +45,14 @@ BuildHandler (construct routes + middleware)
 Start HTTP/HTTPS Server
 ```
 
+A WAFFLE application always follows this strict lifecycle.  
+- **LoadConfig** should be lightweight and only read configuration.  
+- **ConnectDB** initializes all long‑lived backend connections; nothing else should create DB clients.  
+- **EnsureSchema** runs only at startup to guarantee indexes, migrations, and boot‑time structure.  
+- **BuildHandler** constructs the handler graph, routes, middleware, and feature wiring—this stage should avoid I/O.  
+- Finally, **Start Server** launches the HTTP/HTTPS listener using the fully prepared handler.
+```
+
 ---
 
 # 🟩 Configuration Flow  
@@ -65,6 +73,14 @@ flowchart LR
 config file ─┐
 env vars ────┼──→ Viper Loader → CoreConfig
 CLI flags ───┘                  → AppConfig
+```
+
+This flow shows how WAFFLE builds both `CoreConfig` and `AppConfig`.  
+- Configuration may come from files, environment variables, or CLI flags.  
+- WAFFLE merges these sources using Viper: **CLI > Env > File > Defaults**.  
+- `CoreConfig` drives framework behavior (ports, HTTPS, logging, ACME, etc.).  
+- `AppConfig` contains only application‑specific values that you define in your service.  
+This separation keeps the framework clean and predictable.
 ```
 
 ---
@@ -94,6 +110,14 @@ AppConfig + DBDeps + Logger
          chi.Router
 ```
 
+This diagram explains how WAFFLE wires HTTP behavior together.  
+- A **Handler** holds everything a feature needs (config, DBDeps, logger).  
+- **Routes(h)** creates a subrouter bound to that handler instance.  
+- **BuildHandler** mounts each feature’s subrouter at a top‑level path.  
+- The final **chi.Router** is the complete routing graph passed to the server.  
+This structure allows WAFFLE to remain explicit, testable, and easy to reason about.
+```
+
 ---
 
 # 🟨 Feature Folder Structure  
@@ -115,6 +139,14 @@ internal/app/features/xyz/
     routes.go
     templates/       (optional)
     service.go       (optional)
+```
+
+Each feature lives in its own folder under `internal/app/features/...`.  
+- `handler.go` contains business logic and handler methods.  
+- `routes.go` binds these handler methods to HTTP routes.  
+- `templates/` may include HTMX/Tailwind partials.  
+- `service.go` is optional and holds internal feature logic.  
+This pattern keeps code isolated, modular, and discoverable.
 ```
 
 ---
@@ -145,6 +177,14 @@ Feature Subrouter
 Handler Method
       ↓
 Response
+```
+
+This diagram shows what happens when WAFFLE receives an HTTP request.  
+- The request enters the **chi router**, which applies global middleware.  
+- It then flows into the feature‑specific subrouter bound in `BuildHandler`.  
+- The router dispatches to the correct handler method.  
+- The handler writes a response using only explicit dependencies.  
+This predictable path makes debugging and performance tuning easier.
 ```
 
 ---
@@ -178,6 +218,14 @@ Certificate Cache
    HTTPS Server
 ```
 
+WAFFLE supports both manual TLS and automatic Let’s Encrypt.  
+- When **use_lets_encrypt=true**, WAFFLE performs ACME challenges (http‑01 or dns‑01).  
+- Certificates are cached and automatically renewed.  
+- When **manual TLS** is used, you provide `cert_file` and `key_file`.  
+- In both cases, WAFFLE launches the HTTPS server once certificates are ready.  
+This design avoids complexity for developers while supporting secure deployments.
+```
+
 ---
 
 # 🟫 WAFFLE Toolkit Integration  
@@ -206,6 +254,12 @@ Handlers & Routes
  Toolkit (CORS, Windows services, etc.)
        ↓
    HTTP Server
+```
+
+The toolkit provides optional helpers that fit naturally into the middleware chain.  
+- `cors` injects CORS headers and preflight handling.  
+- `windowsservice` adapts WAFFLE to the Windows Service Control Manager.  
+Because toolkit modules are middleware, they compose cleanly with features and routing without adding framework complexity.
 ```
 
 ---
@@ -239,6 +293,15 @@ internal/
     store/
   domain/
     models/
+```
+
+This directory layout is produced automatically by `makewaffle`.  
+- `bootstrap/` holds lifecycle integration: config, DBDeps, and hooks.  
+- `features/` holds handler logic, templates, and routing.  
+- `policy/` is for authorization and validation rules.  
+- `store/` holds persistence code.  
+- `domain/models/` defines your business entities.  
+This structure ensures consistency across all WAFFLE‑based services.
 ```
 
 ---
