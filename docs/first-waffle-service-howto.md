@@ -44,8 +44,12 @@ To scaffold new WAFFLE applications, install the WAFFLE CLI:
 go install github.com/dalemusser/waffle/cmd/makewaffle@latest
 ```
 
+
 Ensure that your Go bin directory  
 (often `~/go/bin`) is on your PATH.
+
+> **Need help setting your PATH?**  
+> See: [Setting Your PATH](./set-path.md)
 
 > **Optional:**  
 > WAFFLE also provides **wafflectl**, following standard command‑line naming (like `kubectl`).  

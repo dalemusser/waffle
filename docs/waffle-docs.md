@@ -15,11 +15,14 @@ Use it as your starting point when exploring or contributing to WAFFLE docs.
 - **[WAFFLE Quickstart Guide](./quickstart-guide.md)**  
   A concise, practical overview for developers who want the fastest path to productivity.
 
-- **[WAFFLE Documentation Creation Guidelines](./about_document_creation.md)**  
+- **[WAFFLE Documentation Creation Guidelines](./about-document-creation.md)**  
   Standards and principles for writing clear, connected, and architectural WAFFLE documentation.
 
 - **[makewaffle CLI Guide](./makewaffle.md)**  
   Complete reference for all `makewaffle` commands, flags, directory behavior, and usage scenarios.
+
+- **[Setting Your PATH](./set-path.md)**  
+  How to add `~/go/bin` to your PATH on macOS, Linux, and Windows.
 
 ### **2. Core Framework Concepts**
 - **[WAFFLE Framework – Developer Documentation](./developer-documentation.md)**  
@@ -46,7 +49,7 @@ All live under `docs/examples/`.
 
 ### **Configuration Patterns**
 - **[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)**
-- **[WAFFLE Configuration Overview](./examples/about_waffle_config.md)**
+- **[WAFFLE Configuration Overview](./examples/about-waffle-config.md)**
 - **[WAFFLE Provided Configuration Variables](./examples/waffle-provided-config-vars.md)**
 - **[CORS Examples](./examples/cors-examples.md)**
 - **[DBDeps Usage Examples](./examples/dbdeps-usage-examples.md)**
@@ -78,12 +81,13 @@ docs/
 ├── first-waffle-service-howto.md
 ├── quickstart-guide.md
 ├── makewaffle.md
+├── set-path.md
 ├── routes-and-middleware-guide.md
 ├── waffle-architecture-diagrams.md
-├── about_document_creation.md
+├── about-document-creation.md
 │
 ├── examples/
-│   ├── about_waffle_config.md
+│   ├── about-waffle-config.md
 │   ├── dbdeps-mongo.md
 │   ├── dbdeps-postgres.md
 │   ├── dbdeps-postgres-pgxpool.md

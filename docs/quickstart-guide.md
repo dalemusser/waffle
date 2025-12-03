@@ -44,7 +44,11 @@ go install github.com/dalemusser/waffle/cmd/makewaffle@latest
 
 This installs the `makewaffle` command and downloads the WAFFLE module into your Go toolchain. When you later run `go mod tidy` in your generated project, Go will automatically add `github.com/dalemusser/waffle` to your `go.mod`.
 
+
 Make sure your Go bin directory (often `~/go/bin`) is on your `PATH` so you can run `makewaffle` from the terminal.
+
+> **Need help setting your PATH?**  
+> See: [Setting Your PATH](./set-path.md)
 
 If you prefer an industry-standard CLI name, you can install `wafflectl` instead:
 
@@ -158,7 +162,7 @@ See also the
 [WAFFLE Lifecycle](./waffle-architecture-diagrams.md#-waffle-lifecycle) diagram in the architecture reference.
 
 If this is unfamiliar, read the  
-**[WAFFLE Documentation Creation Guidelines](./about_document_creation.md)**  
+**[WAFFLE Documentation Creation Guidelines](./about-document-creation.md)**  
 which explains the philosophy behind WAFFLE docs.
 
 ---
@@ -177,7 +181,7 @@ type AppConfig struct {
 
 Learn more:  
 **[Examples of AppConfig Patterns](./examples/examples-of-appconfig-patterns.md)**  
-**[WAFFLE Configuration Overview](./examples/about_waffle_config.md)**
+**[WAFFLE Configuration Overview](./examples/about-waffle-config.md)**
 
 ---
 
@@ -322,7 +326,7 @@ See full example:
 WAFFLE supports TOML, YAML, JSON, environment variables, and CLI flags.
 
 Full configuration reference:  
-- **[WAFFLE Configuration Overview](./examples/about_waffle_config.md)**  
+- **[WAFFLE Configuration Overview](./examples/about-waffle-config.md)**  
 - **[WAFFLE Provided Configuration Variables](./examples/waffle-provided-config-vars.md)**
 
 ---
@@ -345,7 +349,7 @@ Explore deeper topics:
 - [DBDeps Usage Examples](./examples/dbdeps-usage-examples.md)
 - [Handler Structure Examples](./examples/handler-structure-examples.md)
 - [CORS Examples](./examples/cors-examples.md)
-- [WAFFLE Configuration Overview](./examples/about_waffle_config.md)
+- [WAFFLE Configuration Overview](./examples/about-waffle-config.md)
 
 Or build complete Strata services using WAFFLE:
 

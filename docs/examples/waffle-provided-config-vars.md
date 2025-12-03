@@ -2,7 +2,7 @@
 *A complete reference to all built‑in WAFFLE CoreConfig variables, their meanings, requirements, and how to set them.*
 
 This document complements the broader configuration overview in  
-**[WAFFLE Configuration Overview](./about_waffle_config.md)** by listing **every WAFFLE‑provided configuration variable**, including:
+**[WAFFLE Configuration Overview](./about-waffle-config.md)** by listing **every WAFFLE‑provided configuration variable**, including:
 
 - Config file key  
 - Environment variable name (WAFFLE_…)  
