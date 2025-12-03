@@ -51,6 +51,8 @@ If you prefer an industry-standard CLI name, you can install `wafflectl` instead
 ```bash
 go install github.com/dalemusser/waffle/cmd/wafflectl@latest
 ```
+> **Need the full CLI reference?**  
+> See: [makewaffle CLI Documentation](./makewaffle.md)
 
 If you only want to use WAFFLE as a library in an existing Go module (without the CLI), you can add it with:
 

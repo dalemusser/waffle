@@ -53,6 +53,9 @@ Ensure that your Go bin directory
 >  
 > This guide uses **makewaffle** for clarity.
 
+> **Need the full CLI reference?**  
+> See: [makewaffle CLI Documentation](./makewaffle.md)
+
 ---
 
 # 🧱 2. Generate Your First WAFFLE Project

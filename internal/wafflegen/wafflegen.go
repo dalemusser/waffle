@@ -46,6 +46,7 @@ func newCmd(binName string, args []string) int {
 	module := fs.String("module", "", "Go module path for the new app (e.g. github.com/you/hello_waffle)")
 	waffleVersion := fs.String("waffle-version", "", "Version of github.com/dalemusser/waffle to require in go.mod (e.g. v0.1.0)")
 	goVersion := fs.String("go-version", "1.21", "Go language version to declare in go.mod (e.g. 1.21)")
+	force := fs.Bool("force", false, "Scaffold into an existing app directory if it already exists")
 	fs.Usage = func() {
 		fmt.Printf("Usage: %s new <appname> --module <module-path>\n", binName)
 		fs.PrintDefaults()
@@ -96,24 +97,35 @@ func newCmd(binName string, args []string) int {
 		return 1
 	}
 
-	if err := scaffoldApp(appName, *module, *waffleVersion, *goVersion); err != nil {
+	if err := scaffoldApp(appName, *module, *waffleVersion, *goVersion, *force); err != nil {
 		log.Printf("scaffold failed: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-func scaffoldApp(appName, module, waffleVersion, goVersion string) error {
+func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) error {
 	short := appBaseName(appName)
+	if appName == "." {
+		// When scaffolding into the current directory, derive the short name
+		// from the module path so cmd/<short> is sensible.
+		short = appBaseName(module)
+	}
 
 	fmt.Printf("Creating WAFFLE app %q with module %q\n", appName, module)
 
-	// Create root directory
-	if err := os.Mkdir(appName, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", appName, err)
+	// Create root directory if we're not scaffolding into the current directory.
+	if appName != "." {
+		if err := os.Mkdir(appName, 0o755); err != nil {
+			// If the directory already exists and --force was not set, fail.
+			if !os.IsExist(err) || !force {
+				return fmt.Errorf("mkdir %s: %w", appName, err)
+			}
+			// If it exists and force is true, continue and scaffold into it.
+		}
 	}
 
-	// Helper to join paths under app root
+	// Helper to join paths under app root (or current directory when appName == ".").
 	join := func(parts ...string) string {
 		return filepath.Join(append([]string{appName}, parts...)...)
 	}

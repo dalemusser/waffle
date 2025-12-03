@@ -18,6 +18,9 @@ Use it as your starting point when exploring or contributing to WAFFLE docs.
 - **[WAFFLE Documentation Creation Guidelines](./about_document_creation.md)**  
   Standards and principles for writing clear, connected, and architectural WAFFLE documentation.
 
+- **[makewaffle CLI Guide](./makewaffle.md)**  
+  Complete reference for all `makewaffle` commands, flags, directory behavior, and usage scenarios.
+
 ### **2. Core Framework Concepts**
 - **[WAFFLE Framework – Developer Documentation](./developer-documentation.md)**  
   Deep dive into WAFFLE’s architecture, lifecycle, configuration, logging, server behavior, and middleware.
@@ -74,6 +77,7 @@ docs/
 ├── developer-documentation.md
 ├── first-waffle-service-howto.md
 ├── quickstart-guide.md
+├── makewaffle.md
 ├── routes-and-middleware-guide.md
 ├── waffle-architecture-diagrams.md
 ├── about_document_creation.md
