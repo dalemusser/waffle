@@ -106,26 +106,19 @@ func newCmd(binName string, args []string) int {
 
 func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) error {
 	short := appBaseName(appName)
-	if appName == "." {
-		// When scaffolding into the current directory, derive the short name
-		// from the module path so cmd/<short> is sensible.
-		short = appBaseName(module)
-	}
 
 	fmt.Printf("Creating WAFFLE app %q with module %q\n", appName, module)
 
-	// Create root directory if we're not scaffolding into the current directory.
-	if appName != "." {
-		if err := os.Mkdir(appName, 0o755); err != nil {
-			// If the directory already exists and --force was not set, fail.
-			if !os.IsExist(err) || !force {
-				return fmt.Errorf("mkdir %s: %w", appName, err)
-			}
-			// If it exists and force is true, continue and scaffold into it.
+	// Create root directory (or honor --force when it already exists).
+	if err := os.Mkdir(appName, 0o755); err != nil {
+		// If the directory already exists and --force was not set, fail.
+		if !os.IsExist(err) || !force {
+			return fmt.Errorf("mkdir %s: %w", appName, err)
 		}
+		// If it exists and force is true, continue and scaffold into it.
 	}
 
-	// Helper to join paths under app root (or current directory when appName == ".").
+	// Helper to join paths under app root.
 	join := func(parts ...string) string {
 		return filepath.Join(append([]string{appName}, parts...)...)
 	}
