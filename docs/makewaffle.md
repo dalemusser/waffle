@@ -10,6 +10,29 @@ The `makewaffle` command scaffolds a new WAFFLE application. It supports two mai
 makewaffle new <appname> --module <module-path> [--force]
 ```
 
+## Getting Help
+
+`makewaffle` supports several ways to view help:
+
+### Top‑level help
+These commands show overall usage:
+
+```
+makewaffle
+makewaffle --help
+makewaffle -h
+makewaffle help
+```
+
+### Subcommand help
+To view help for the `new` subcommand:
+
+```
+makewaffle new --help
+```
+
+This displays all flags such as `--module`, `--force`, `--waffle-version`, and `--go-version`.
+
 ### Arguments
 - `<appname>`: The directory where the skeleton will be created. Must be a valid name (letters, digits, and underscores).
 - `--module`: Required. The Go module path for your new service (e.g. `github.com/example/hello`).

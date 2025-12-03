@@ -66,10 +66,12 @@ Which is typically:
 macOS ships with **zsh** as the default shell (newer versions) but still supports **bash**, **fish**, and others.
 
 ## macOS + zsh (default)
+On macOS, Terminal and iTerm usually launch **login shells**, which read `~/.zprofile` rather than `~/.zshrc`. You may edit either file, but `~/.zprofile` is recommended for PATH configuration.
+
 Edit your PATH in:
 
 ```
-~/.zshrc
+~/.zprofile
 ```
 
 Add this line:
@@ -81,8 +83,10 @@ export PATH="$HOME/go/bin:$PATH"
 Apply the change:
 
 ```bash
-source ~/.zshrc
+source ~/.zprofile
 ```
+
+(If you prefer to keep PATH settings in `~/.zshrc`, you can place the same export there.)
 
 ## macOS + bash
 If you're using bash instead of zsh, edit:
@@ -127,6 +131,47 @@ Reload fish:
 ```fish
 source ~/.config/fish/config.fish
 ```
+
+---
+
+# 🖥️ 2.5 VSCode Terminal Behavior (Important!)
+
+VSCode’s integrated terminal does **not** behave the same as the macOS Terminal or Linux terminal. This can affect whether your PATH settings (especially for `~/go/bin`) take effect.
+
+## VSCode launched from Dock / Applications
+When you open VSCode from the macOS Dock, Spotlight, or Applications folder:
+
+- VSCode inherits **macOS GUI environment variables**, not your shell’s login environment.
+- The integrated terminal starts a **non‑login interactive shell**.
+- This means **`~/.zprofile` is *not* read**.
+- Only `~/.zshrc` (for zsh) or `~/.bashrc` (for bash) is read.
+
+So if your PATH is set only in `~/.zprofile`, VSCode may *not* see it.
+
+## VSCode launched via `code .` (recommended)
+If you open VSCode from Terminal using:
+
+```bash
+code .
+```
+
+Then:
+- VSCode inherits **your Terminal environment**, including the PATH created by `~/.zprofile`.
+- The VSCode integrated terminal then loads `~/.zshrc` or `~/.bashrc` normally.
+
+This is the most reliable way to ensure VSCode sees the same PATH as your system terminal.
+
+## Best Practice
+To avoid PATH differences between Terminal and VSCode:
+
+1. Add your PATH to **`~/.zprofile`** (macOS login shell)
+2. ALSO add the line below to `~/.zshrc` so VSCode picks it up:
+
+```bash
+source ~/.zprofile
+```
+
+This ensures **both Terminal and VSCode** have the same PATH.
 
 ---
 
@@ -246,6 +291,53 @@ You can also add it permanently via GUI:
    ```
    %USERPROFILE%\go\bin
    ```
+
+---
+
+# 
+# 🛠️ Troubleshooting PATH Issues in VSCode
+
+If `makewaffle` or other Go-installed tools work in your system terminal but **do not work inside VSCode**, the cause depends on your operating system.
+
+## macOS / Linux
+VSCode launches a **non-login interactive shell**, which means it may not read `~/.zprofile` (macOS) or other login shell configuration files.
+
+Fix:
+- Ensure your PATH is set in `~/.zprofile` **and** that `~/.zshrc` contains:
+
+```bash
+source ~/.zprofile
+```
+
+- Or open VSCode from Terminal using:
+
+```bash
+code .
+```
+
+This makes VSCode inherit your correct environment.
+
+## Windows
+VSCode inherits its PATH from the **Windows environment**, not from shell startup files.
+
+If you recently changed PATH:
+- **Restart VSCode completely** so it picks up the updated PATH.
+- Also restart PowerShell or cmd.exe if they were open during the change.
+
+## Verifying PATH Inside VSCode Terminal
+Run:
+
+```bash
+echo $PATH          # macOS / Linux
+echo $env:PATH      # Windows PowerShell
+echo %PATH%         # Windows cmd.exe
+```
+
+Look for:
+- `~/go/bin` on macOS/Linux
+- `%USERPROFILE%\go\bin` on Windows
+
+If the directory is missing, re-check the steps above.
 
 ---
 

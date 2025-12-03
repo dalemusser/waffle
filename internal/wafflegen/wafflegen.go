@@ -16,12 +16,17 @@ import (
 //
 // It returns a process exit code; callers should os.Exit(Run(...)).
 func Run(binName string, args []string) int {
+	// No arguments: show top-level usage.
 	if len(args) < 1 {
 		usage(binName)
 		return 1
 	}
 
+	// Global help flags: makewaffle --help, makewaffle -h, makewaffle help
 	switch args[0] {
+	case "-h", "--help", "help":
+		usage(binName)
+		return 0
 	case "new":
 		return newCmd(binName, args[1:])
 	default:
@@ -145,7 +150,7 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) e
 	}
 
 	// Files
-	if err := os.WriteFile(join("cmd", short, "main.go"), []byte(mainGoContent(module, short)), 0o644); err != nil {
+	if err := os.WriteFile(join("cmd", short, "main.go"), []byte(mainGoContent(module)), 0o644); err != nil {
 		return fmt.Errorf("write main.go: %w", err)
 	}
 
@@ -232,7 +237,7 @@ go %s
 `, module, goVersion)
 }
 
-func mainGoContent(module, short string) string {
+func mainGoContent(module string) string {
 	return fmt.Sprintf(`package main
 
 import (

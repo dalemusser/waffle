@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/logging"
@@ -12,6 +13,8 @@ import (
 	"github.com/dalemusser/waffle/server"
 	"go.uber.org/zap"
 )
+
+const defaultShutdownTimeout = 10 * time.Second
 
 // Hooks defines the integration points an application must provide
 // for WAFFLE to run it.
@@ -37,6 +40,13 @@ type Hooks[C any, D any] struct {
 	// BuildHandler must construct the final http.Handler for the app:
 	// this includes routers, Waffle middleware, app middleware, and routes.
 	BuildHandler func(core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) (http.Handler, error)
+
+	// Shutdown is called after the HTTP server has stopped and the
+	// shutdown context has been canceled. It is the app's opportunity
+	// to gracefully tear down any resources created in ConnectDB
+	// (databases, caches, external clients, etc.). It may be nil if
+	// the app doesn’t need explicit shutdown logic.
+	Shutdown func(context.Context, *config.CoreConfig, C, D, *zap.Logger) error
 }
 
 // Run executes the standard Waffle startup sequence:
@@ -50,6 +60,8 @@ type Hooks[C any, D any] struct {
 //  7. Wire shutdown signals to a context
 //  8. Build the HTTP handler (Hooks.BuildHandler)
 //  9. Start the HTTP(S) server and block until shutdown
+//
+// 10. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
 func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 	// 1) Bootstrap logger for early startup
 	bootstrap := logging.BootstrapLogger()
@@ -105,11 +117,35 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 		os.Exit(1)
 	}
 
-	// 9) Start HTTP server
-	if err := server.ListenAndServeWithContext(ctx, coreCfg, handler, logger); err != nil {
-		logger.Error("server exited with error", zap.Error(err))
-		return err
+	// 9) Start HTTP server and wait for shutdown
+	serverErr := server.ListenAndServeWithContext(ctx, coreCfg, handler, logger)
+	if serverErr != nil {
+		logger.Error("server exited with error", zap.Error(serverErr))
+	} else {
+		logger.Info("server stopped")
 	}
-	logger.Info("server stopped")
+
+	// 10) Run optional shutdown hook (cleanup)
+	var shutdownErr error
+	if hooks.Shutdown != nil {
+		// defaultShutdownTimeout controls how long WAFFLE will wait
+		// for the app's Shutdown hook to complete.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), defaultShutdownTimeout)
+		defer cancel()
+
+		if err := hooks.Shutdown(shutdownCtx, coreCfg, appCfg, dbBundle, logger); err != nil {
+			logger.Error("shutdown hook failed", zap.Error(err))
+			shutdownErr = err
+		}
+	}
+
+	// Prefer to return the server error if it exists,
+	// otherwise return any shutdown error.
+	if serverErr != nil {
+		return serverErr
+	}
+	if shutdownErr != nil {
+		return shutdownErr
+	}
 	return nil
 }
