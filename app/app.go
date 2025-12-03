@@ -27,6 +27,12 @@ type Hooks[C any, D any] struct {
 	// internally, plus any app-level config loading/validation.
 	LoadConfig func(logger *zap.Logger) (*config.CoreConfig, C, error)
 
+	// ValidateConfig can perform app-specific validation on the loaded
+	// core and app config before any backends are connected. It may be
+	// nil if the app doesn’t require extra validation. Returning an
+	// error here will abort startup before any external resources are used.
+	ValidateConfig func(core *config.CoreConfig, appCfg C, logger *zap.Logger) error
+
 	// ConnectDB is responsible for connecting to any databases or backends
 	// the app needs, using the core + app config. It should respect
 	// cfg.DBConnectTimeout for its own timeouts.
@@ -53,15 +59,15 @@ type Hooks[C any, D any] struct {
 //
 //  1. Bootstrap logger
 //  2. Load core + app config (Hooks.LoadConfig)
-//  3. Build final logger based on core config
-//  4. Register default metrics
-//  5. Connect DB/backends (Hooks.ConnectDB)
-//  6. Ensure schema/indexes (Hooks.EnsureSchema, if provided)
-//  7. Wire shutdown signals to a context
-//  8. Build the HTTP handler (Hooks.BuildHandler)
-//  9. Start the HTTP(S) server and block until shutdown
-//
-// 10. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
+//  3. Validate the loaded config (Hooks.ValidateConfig, if provided)
+//  4. Build final logger based on core config
+//  5. Register default metrics
+//  6. Connect DB/backends (Hooks.ConnectDB)
+//  7. Ensure schema/indexes (Hooks.EnsureSchema, if provided)
+//  8. Wire shutdown signals to a context
+//  9. Build the HTTP handler (Hooks.BuildHandler)
+//  10. Start the HTTP(S) server and block until shutdown
+//  11. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
 func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 	// 1) Bootstrap logger for early startup
 	bootstrap := logging.BootstrapLogger()
@@ -80,22 +86,30 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 		zap.String("log_level", coreCfg.LogLevel),
 	)
 
-	// 3) Build final logger
+	// 3) Optionally validate the loaded config before proceeding.
+	if hooks.ValidateConfig != nil {
+		if err := hooks.ValidateConfig(coreCfg, appCfg, bootstrap); err != nil {
+			bootstrap.Error("config validation failed", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	// 4) Build final logger
 	logger := logging.MustBuildLogger(coreCfg.LogLevel, coreCfg.Env)
 	defer logger.Sync()
 	logger.Info("logger initialized", zap.String("app", hooks.Name))
 
-	// 4) Register default metrics (Go, process, HTTP histograms)
+	// 5) Register default metrics (Go, process, HTTP histograms)
 	metrics.RegisterDefault(logger)
 
-	// 5) Connect DB/backends
+	// 6) Connect DB/backends
 	dbBundle, err := hooks.ConnectDB(ctx, coreCfg, appCfg, logger)
 	if err != nil {
 		logger.Error("DB connect failed", zap.Error(err))
 		os.Exit(1)
 	}
 
-	// 6) Ensure schema/indexes (optional)
+	// 7) Ensure schema/indexes (optional)
 	if hooks.EnsureSchema != nil {
 		schemaCtx, cancel := context.WithTimeout(context.Background(), coreCfg.IndexBootTimeout)
 		defer cancel()
@@ -106,18 +120,18 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 		}
 	}
 
-	// 7) Wire shutdown signals → context
+	// 8) Wire shutdown signals → context
 	ctx, cancel := server.WithShutdownSignals(ctx, logger)
 	defer cancel()
 
-	// 8) Build HTTP handler (router + middleware + routes)
+	// 9) Build HTTP handler (router + middleware + routes)
 	handler, err := hooks.BuildHandler(coreCfg, appCfg, dbBundle, logger)
 	if err != nil {
 		logger.Error("handler build failed", zap.Error(err))
 		os.Exit(1)
 	}
 
-	// 9) Start HTTP server and wait for shutdown
+	// 10) Start HTTP server and wait for shutdown
 	serverErr := server.ListenAndServeWithContext(ctx, coreCfg, handler, logger)
 	if serverErr != nil {
 		logger.Error("server exited with error", zap.Error(serverErr))
@@ -125,7 +139,7 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 		logger.Info("server stopped")
 	}
 
-	// 10) Run optional shutdown hook (cleanup)
+	// 11) Run optional shutdown hook (cleanup)
 	var shutdownErr error
 	if hooks.Shutdown != nil {
 		// defaultShutdownTimeout controls how long WAFFLE will wait
