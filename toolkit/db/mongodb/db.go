@@ -1,5 +1,5 @@
-// toolkit/mongo/db.go
-package mongo
+// toolkit/db/mongodb/db.go
+package mongodb
 
 import (
 	"context"

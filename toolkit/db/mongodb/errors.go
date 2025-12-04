@@ -1,5 +1,5 @@
-// toolkit/mongo/errors.go
-package mongo
+// toolkit/db/mongodb/errors.go
+package mongodb
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-// toolkit/cors/cors.go
+// toolkit/http/cors/cors.go
 package cors
 
 import (

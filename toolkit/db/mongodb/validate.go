@@ -1,5 +1,5 @@
-// toolkit/mongo/validate.go
-package mongo
+// toolkit/db/mongodb/validate.go
+package mongodb
 
 import (
 	"fmt"
