@@ -43,8 +43,11 @@ type Hooks[C any, D any] struct {
 	// doesn’t need any schema bootstrapping.
 	EnsureSchema func(ctx context.Context, core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) error
 
-	// AppSetup is called to prepare the app before providing services.
-	AppSetup func(ctx context.Context, core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) error
+	// Startup runs one-time application initialization after DBs and schemas
+	// are ready, but before the HTTP handler is built and requests are served.
+	// It may be nil if the app doesn’t need any extra initialization
+	// beyond config, DB, and schema setup.
+	Startup func(ctx context.Context, core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) error
 
 	// BuildHandler must construct the final http.Handler for the app:
 	// this includes routers, Waffle middleware, app middleware, and routes.
@@ -68,7 +71,7 @@ type Hooks[C any, D any] struct {
 //  6. Connect DB/backends (Hooks.ConnectDB)
 //  7. Ensure schema/indexes (Hooks.EnsureSchema, if provided)
 //  8. Wire shutdown signals to a context
-//  9. App setup (Hooks.AppSetup, if provided)
+//  9. Startup (Hooks.Startup, if provided)
 //  10. Build the HTTP handler (Hooks.BuildHandler)
 //  11. Start the HTTP(S) server and block until shutdown
 //  12. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
@@ -128,10 +131,10 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 	ctx, cancel := server.WithShutdownSignals(ctx, logger)
 	defer cancel()
 
-	// 9) App setup (optional)
-	if hooks.AppSetup != nil {
-		if err := hooks.AppSetup(ctx, coreCfg, appCfg, dbBundle, logger); err != nil {
-			logger.Error("app setup failed", zap.Error(err))
+	// 9) Startup (optional)
+	if hooks.Startup != nil {
+		if err := hooks.Startup(ctx, coreCfg, appCfg, dbBundle, logger); err != nil {
+			logger.Error("startup failed", zap.Error(err))
 			os.Exit(1)
 		}
 	}
