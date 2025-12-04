@@ -68,9 +68,10 @@ type Hooks[C any, D any] struct {
 //  6. Connect DB/backends (Hooks.ConnectDB)
 //  7. Ensure schema/indexes (Hooks.EnsureSchema, if provided)
 //  8. Wire shutdown signals to a context
-//  9. Build the HTTP handler (Hooks.BuildHandler)
-//  10. Start the HTTP(S) server and block until shutdown
-//  11. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
+//  9. App setup (Hooks.AppSetup, if provided)
+//  10. Build the HTTP handler (Hooks.BuildHandler)
+//  11. Start the HTTP(S) server and block until shutdown
+//  12. Run the optional shutdown hook (Hooks.Shutdown) to clean up resources
 func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 	// 1) Bootstrap logger for early startup
 	bootstrap := logging.BootstrapLogger()
@@ -127,14 +128,22 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 	ctx, cancel := server.WithShutdownSignals(ctx, logger)
 	defer cancel()
 
-	// 9) Build HTTP handler (router + middleware + routes)
+	// 9) App setup (optional)
+	if hooks.AppSetup != nil {
+		if err := hooks.AppSetup(ctx, coreCfg, appCfg, dbBundle, logger); err != nil {
+			logger.Error("app setup failed", zap.Error(err))
+			os.Exit(1)
+		}
+	}
+
+	// 10) Build HTTP handler (router + middleware + routes)
 	handler, err := hooks.BuildHandler(coreCfg, appCfg, dbBundle, logger)
 	if err != nil {
 		logger.Error("handler build failed", zap.Error(err))
 		os.Exit(1)
 	}
 
-	// 10) Start HTTP server and wait for shutdown
+	// 11) Start HTTP server and wait for shutdown
 	serverErr := server.ListenAndServeWithContext(ctx, coreCfg, handler, logger)
 	if serverErr != nil {
 		logger.Error("server exited with error", zap.Error(serverErr))
@@ -142,7 +151,7 @@ func Run[C any, D any](ctx context.Context, hooks Hooks[C, D]) error {
 		logger.Info("server stopped")
 	}
 
-	// 11) Run optional shutdown hook (cleanup)
+	// 12) Run optional shutdown hook (cleanup)
 	var shutdownErr error
 	if hooks.Shutdown != nil {
 		// defaultShutdownTimeout controls how long WAFFLE will wait
