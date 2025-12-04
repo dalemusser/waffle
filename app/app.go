@@ -43,6 +43,9 @@ type Hooks[C any, D any] struct {
 	// doesn’t need any schema bootstrapping.
 	EnsureSchema func(ctx context.Context, core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) error
 
+	// AppSetup is called to prepare the app before providing services.
+	AppSetup func(ctx context.Context, core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) error
+
 	// BuildHandler must construct the final http.Handler for the app:
 	// this includes routers, Waffle middleware, app middleware, and routes.
 	BuildHandler func(core *config.CoreConfig, appCfg C, db D, logger *zap.Logger) (http.Handler, error)
