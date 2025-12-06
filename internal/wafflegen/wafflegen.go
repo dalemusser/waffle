@@ -166,6 +166,10 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) e
 		return fmt.Errorf("write hooks.go: %w", err)
 	}
 
+	if err := os.WriteFile(join("internal", "app", "bootstrap", "startup.go"), []byte(startupContent()), 0o644); err != nil {
+		return fmt.Errorf("write startup.go: %w", err)
+	}
+
 	fmt.Println("Done!")
 	fmt.Println()
 	fmt.Println("Next steps:")
@@ -203,7 +207,7 @@ func validateAppName(name string) error {
 		if !((r >= 'a' && r <= 'z') ||
 			(r >= 'A' && r <= 'Z') ||
 			(r >= '0' && r <= '9') ||
-			r == '_') {
+			(r == '_')) {
 			return fmt.Errorf("app name %q contains invalid character %q; only letters, digits, and underscore are allowed", name, r)
 		}
 		// do not allow starting with a digit
@@ -282,27 +286,27 @@ func hooksContent(appName string) string {
 	const tpl = `package bootstrap
 
 import (
-    "context"
-    "net/http"
+	"context"
+	"net/http"
 
-    "github.com/dalemusser/waffle/app"
-    "github.com/dalemusser/waffle/config"
-    "github.com/go-chi/chi/v5"
-    "go.uber.org/zap"
+	"github.com/dalemusser/waffle/app"
+	"github.com/dalemusser/waffle/config"
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 // LoadConfig loads WAFFLE core config and app-specific config.
 func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
-    coreCfg, err := config.Load(logger)
-    if err != nil {
-        return nil, AppConfig{}, err
-    }
+	coreCfg, err := config.Load(logger)
+	if err != nil {
+		return nil, AppConfig{}, err
+	}
 
-    appCfg := AppConfig{
-        Greeting: "Hello from WAFFLE!",
-    }
+	appCfg := AppConfig{
+		Greeting: "Hello from WAFFLE!",
+	}
 
-    return coreCfg, appCfg, nil
+	return coreCfg, appCfg, nil
 }
 
 // ConnectDB connects to databases or other backends.
@@ -334,9 +338,33 @@ var Hooks = app.Hooks[AppConfig, DBDeps]{
 	LoadConfig:   LoadConfig,
 	ConnectDB:    ConnectDB,
 	EnsureSchema: EnsureSchema,
+	Startup:      Startup,
 	BuildHandler: BuildHandler,
 }
 `
 
 	return fmt.Sprintf(tpl, name)
+}
+
+// startupContent generates the bootstrap/startup.go file, which provides
+// a default no-op Startup hook that applications can customize.
+func startupContent() string {
+	return `package bootstrap
+
+import (
+	"context"
+
+	"github.com/dalemusser/waffle/config"
+	"go.uber.org/zap"
+)
+
+// Startup runs one-time application initialization after DB connections and
+// schema setup are complete, but before the HTTP handler is built and
+// requests are served. Use this to load shared templates, warm caches, or
+// perform any app-wide setup that depends on config and backends.
+func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+	// TODO: perform any application-specific startup work here.
+	return nil
+}
+`
 }
