@@ -1,0 +1,40 @@
+// internal/app/bootstrap/appconfig.go
+package bootstrap
+
+// AppConfig holds service-specific configuration for this WAFFLE app.
+//
+// These values come from environment variables, configuration files, or
+// command-line flags (loaded in LoadConfig). They represent *app-level*
+// configuration, not WAFFLE core configuration.
+//
+// WAFFLE's CoreConfig handles framework-level settings like:
+//   - HTTP/HTTPS ports and TLS configuration
+//   - Logging level and format
+//   - CORS settings
+//   - Request body size limits
+//   - Database connection timeouts
+//
+// AppConfig is where you put everything specific to YOUR application:
+//   - Database connection strings (MongoDB URI, Postgres DSN, etc.)
+//   - External service API keys and endpoints
+//   - Feature flags and application modes
+//   - Business logic configuration
+//   - Default values for your domain
+//
+// Add fields here as your application grows. The struct is passed to
+// most lifecycle hooks, so any configuration needed during startup,
+// request handling, or shutdown should live here.
+type AppConfig struct {
+	// Greeting is an example application-specific field.
+	// Replace or remove this as you build out your app.
+	Greeting string
+
+	// Examples of fields you might add:
+	//
+	// MongoURI     string // MongoDB connection string
+	// RedisAddr    string // Redis server address
+	// SMTPHost     string // Email server for notifications
+	// EnableDemo   bool   // Feature flag for demo mode
+	// MaxPageSize  int    // Pagination limit
+	// DefaultTZ    string // Default timezone for date display
+}

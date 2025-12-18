@@ -15,6 +15,7 @@ import (
 // - RequestID
 // - RealIP
 // - Recoverer (panic → 500)
+// - Compression (if EnableCompression is true)
 // - body size limit (MaxRequestBodyBytes)
 // - metrics HTTP middleware
 // - request logging
@@ -27,6 +28,11 @@ func New(coreCfg *config.CoreConfig, logger *zap.Logger) chi.Router {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(logging.Recoverer(logger))
+
+	// Compression (config-driven, early in stack to compress all responses)
+	// Pass nil for logger since config validation already catches invalid levels;
+	// the runtime clamping is defense in depth and unlikely to trigger.
+	r.Use(middleware.CompressFromConfig(coreCfg, nil))
 
 	// Body size limit (if configured)
 	r.Use(middleware.LimitBodySize(coreCfg.MaxRequestBodyBytes))

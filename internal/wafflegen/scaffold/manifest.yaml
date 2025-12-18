@@ -1,0 +1,68 @@
+# manifest.yaml
+# Defines the directory structure and files to generate for a new WAFFLE app.
+# Template: full
+
+directories:
+  # Command directory (contains main.go)
+  - path: cmd/{{.AppName}}
+
+  # Bootstrap - lifecycle hooks and configuration
+  - path: internal/app/bootstrap
+
+  # Feature modules - self-contained features with routes, handlers, templates
+  - path: internal/app/features
+    readme: readme/features.md.tmpl
+
+  # Resources - embedded files (shared templates, images, JSON, etc.)
+  - path: internal/app/resources
+    readme: readme/resources.md.tmpl
+
+  # System - app-specific shared utilities used across features
+  - path: internal/app/system
+    readme: readme/system.md.tmpl
+
+  # Store - data persistence/repository layer
+  - path: internal/app/store
+    readme: readme/store.md.tmpl
+
+  # Policy - authorization and business rule logic
+  - path: internal/app/policy
+    readme: readme/policy.md.tmpl
+
+  # Domain models - business entities and domain logic
+  - path: internal/domain/models
+    readme: readme/models.md.tmpl
+
+files:
+  # Go module definition
+  - path: go.mod
+    template: go.mod.tmpl
+
+  # Application entry point
+  - path: cmd/{{.AppName}}/main.go
+    template: cmd/main.go.tmpl
+
+  # Bootstrap files - WAFFLE lifecycle hooks
+  - path: internal/app/bootstrap/hooks.go
+    template: bootstrap/hooks.go.tmpl
+
+  - path: internal/app/bootstrap/config.go
+    template: bootstrap/config.go.tmpl
+
+  - path: internal/app/bootstrap/appconfig.go
+    template: bootstrap/appconfig.go.tmpl
+
+  - path: internal/app/bootstrap/db.go
+    template: bootstrap/db.go.tmpl
+
+  - path: internal/app/bootstrap/dbdeps.go
+    template: bootstrap/dbdeps.go.tmpl
+
+  - path: internal/app/bootstrap/startup.go
+    template: bootstrap/startup.go.tmpl
+
+  - path: internal/app/bootstrap/routes.go
+    template: bootstrap/routes.go.tmpl
+
+  - path: internal/app/bootstrap/shutdown.go
+    template: bootstrap/shutdown.go.tmpl

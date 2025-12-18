@@ -1,0 +1,74 @@
+# Resources Directory
+
+This directory contains **embedded resources** for your WAFFLE application.
+
+## Purpose
+
+The resources directory is for files that should be embedded into your application binary using Go's `embed` package. This is ideal for:
+
+- **Shared templates** — Layout templates, navigation, footers used across features
+- **Static assets** — Images, icons, fonts (if not served separately)
+- **Configuration files** — JSON schemas, default configs
+- **Data files** — Lookup tables, seed data
+
+## Example Structure
+
+```
+resources/
+├── resources.go          # Embed directives and loader functions
+├── templates/
+│   ├── layout.gohtml     # Main page layout
+│   ├── menu.gohtml       # Navigation menu
+│   └── footer.gohtml     # Page footer
+├── images/
+│   └── logo.png
+└── data/
+    └── countries.json
+```
+
+## Usage
+
+Create `resources.go` to embed and expose your resources:
+
+```go
+package resources
+
+import (
+    "embed"
+    "sync"
+    "github.com/dalemusser/waffle/templates"
+)
+
+//go:embed templates/*.gohtml
+var FS embed.FS
+
+var registerOnce sync.Once
+
+// LoadSharedTemplates registers shared templates with WAFFLE's template engine.
+// Call this from the Startup hook in bootstrap/startup.go.
+func LoadSharedTemplates() {
+    registerOnce.Do(func() {
+        templates.Register(templates.Set{
+            Name:     "shared",
+            FS:       FS,
+            Patterns: []string{"templates/*.gohtml"},
+        })
+    })
+}
+```
+
+Then load the shared templates in `bootstrap/startup.go`:
+
+```go
+func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+    resources.LoadSharedTemplates()
+    return nil
+}
+```
+
+## Shared Templates vs Feature Templates
+
+- **Shared templates** (in resources) — Used across multiple features (layouts, navigation)
+- **Feature templates** (in features/*/templates) — Specific to one feature
+
+Shared templates are loaded during Startup; feature templates are registered via `init()` functions.

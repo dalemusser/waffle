@@ -3,6 +3,7 @@ package logging
 
 import (
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -23,8 +24,27 @@ func BootstrapLogger() *zap.Logger {
 	return logger
 }
 
+// ValidLogLevels lists all valid zap log levels for validation.
+var ValidLogLevels = []string{"debug", "info", "warn", "error", "dpanic", "panic", "fatal"}
+
+// IsValidLogLevel checks if the given level string is a valid zap log level.
+// Comparison is case-insensitive.
+func IsValidLogLevel(level string) bool {
+	level = strings.ToLower(level)
+	for _, valid := range ValidLogLevels {
+		if level == valid {
+			return true
+		}
+	}
+	return false
+}
+
 // BuildLogger constructs the final logger based on log level and env.
 // If env is "prod", it uses a JSON encoder; otherwise, it uses the development config.
+//
+// Valid log levels are: debug, info, warn, error, dpanic, panic, fatal (case-insensitive).
+// If an invalid level is provided, it defaults to "info" and logs a warning
+// to stderr so the misconfiguration is visible.
 func BuildLogger(level, env string) (*zap.Logger, error) {
 	var cfg zap.Config
 	if env == "prod" {
@@ -37,8 +57,11 @@ func BuildLogger(level, env string) (*zap.Logger, error) {
 	// RFC-3339 timestamps.
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	// Honor desired level; default to info on bad input.
-	if err := cfg.Level.UnmarshalText([]byte(level)); err != nil {
+	// Honor desired level (case-insensitive); warn and default to info on bad input.
+	if err := cfg.Level.UnmarshalText([]byte(strings.ToLower(level))); err != nil {
+		// Log warning to stderr so the misconfiguration is visible
+		_, _ = os.Stderr.WriteString("WARNING: invalid log level \"" + level +
+			"\"; valid levels are: debug, info, warn, error, dpanic, panic, fatal. Defaulting to \"info\".\n")
 		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	}
 

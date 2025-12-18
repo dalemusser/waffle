@@ -1,0 +1,89 @@
+# System Directory
+
+This directory contains **app-specific shared utilities** used across multiple features.
+
+## Purpose
+
+The system directory is for code that:
+
+- Is **shared across features** but not feature-specific
+- Is **specific to this application** (not reusable across different apps)
+- Provides **helper functions and utilities** that multiple features need
+
+## System vs Toolkit vs Features
+
+| Directory | Scope | Examples |
+|-----------|-------|----------|
+| `features/` | Feature-specific code | User routes, product handlers |
+| `system/` | App-specific shared code | Auth helpers, pagination, search |
+| `waffle/toolkit/` | Framework utilities (reusable) | Email validation, MongoDB helpers |
+
+## Example Structure
+
+```
+system/
+├── auth/
+│   ├── session.go        # Session management
+│   └── middleware.go     # Auth middleware
+├── authz/
+│   └── permissions.go    # Authorization checks
+├── paging/
+│   └── paging.go         # Pagination helpers
+├── search/
+│   └── search.go         # Search query building
+└── timezones/
+    └── timezones.go      # Timezone utilities
+```
+
+## Usage Example
+
+Create a package in the system directory:
+
+```go
+// system/paging/paging.go
+package paging
+
+const DefaultPageSize = 20
+const MaxPageSize = 100
+
+type PageInfo struct {
+    Page     int
+    PageSize int
+    Total    int64
+}
+
+func (p PageInfo) Offset() int {
+    return (p.Page - 1) * p.PageSize
+}
+
+func (p PageInfo) TotalPages() int {
+    if p.Total == 0 {
+        return 0
+    }
+    return int((p.Total + int64(p.PageSize) - 1) / int64(p.PageSize))
+}
+```
+
+Use it in a feature:
+
+```go
+// features/users/handlers.go
+package users
+
+import "{{.Module}}/internal/app/system/paging"
+
+func listHandler(w http.ResponseWriter, r *http.Request) {
+    pageInfo := paging.PageInfo{
+        Page:     getPageParam(r),
+        PageSize: paging.DefaultPageSize,
+    }
+    // ... use pageInfo.Offset() for database query
+}
+```
+
+## Guidelines
+
+- Keep packages focused on a single responsibility
+- Avoid circular dependencies between system packages
+- Consider moving code to `waffle/toolkit` if it could benefit other apps
+- Document public functions and types

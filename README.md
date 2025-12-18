@@ -46,12 +46,11 @@ We *really* believe in [**Go**](https://go.dev/).
 
 ## 📚 Documentation
 
-- **[How to Write Your First WAFFLE Service](docs/first-waffle-service-howto.md)**
-- **[WAFFLE Quickstart Guide](docs/quickstart-guide.md)**
-- **[WAFFLE Framework – Developer Documentation](docs/developer-documentation.md)**
-- **[WAFFLE Routes & Middleware Guide](docs/routes-and-middleware-guide.md)**
-- **[Examples](docs/examples/)** — AppConfig patterns, database integration, routes, middleware, and more
-- **[All WAFFLE Documents](docs/waffle-docs.md)**
+- **[Quickstart Guide](docs/guides/getting-started/quickstart.md)** — Get up and running fast
+- **[First Service Tutorial](docs/guides/getting-started/first-service.md)** — Build your first WAFFLE app
+- **[Core Documentation](docs/core/README.md)** — Configuration, routing, architecture
+- **[Guides](docs/guides/README.md)** — Patterns, databases, authentication, deployment
+- **[Full Documentation Index](docs/waffle-docs.md)** — Complete documentation directory
 
 ---
 

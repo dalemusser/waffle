@@ -1,0 +1,84 @@
+// internal/app/bootstrap/routes.go
+package bootstrap
+
+import (
+	"net/http"
+
+	"github.com/dalemusser/waffle/config"
+	"github.com/dalemusser/waffle/router"
+	"go.uber.org/zap"
+)
+
+// BuildHandler constructs the root HTTP handler (router) for this WAFFLE app.
+//
+// WAFFLE calls this after configuration, DB connections, schema setup, and
+// any Startup hooks have completed. At this point you have access to:
+//   - coreCfg: WAFFLE core configuration (ports, env, timeouts, etc.)
+//   - appCfg: app-specific configuration defined in AppConfig
+//   - deps: any DB or backend clients bundled in DBDeps
+//   - logger: the fully configured zap.Logger for this app
+//
+// This function should:
+//  1. Create a router using router.New (pre-wired with WAFFLE middleware)
+//  2. Mount feature routers for different parts of your application
+//  3. Add any additional middleware needed for specific routes
+//  4. Return the configured router as an http.Handler
+//
+// router.New provides WAFFLE's standard middleware stack:
+//   - RequestID: Unique ID for each request (for tracing)
+//   - RealIP: Extract client IP from X-Forwarded-For headers
+//   - Recoverer: Panic recovery with stack trace logging
+//   - Compression: Response compression (if enabled via config)
+//   - Body size limits: Enforce MaxRequestBodyBytes from config
+//   - HTTP metrics: Prometheus request duration histograms
+//   - Request logging: Structured access logs
+//   - JSON 404/405 handlers: Consistent error responses
+//
+// Example with feature routers:
+//
+//	r := router.New(coreCfg, logger)
+//
+//	// Mount feature modules
+//	r.Mount("/users", users.Routes(deps, logger))
+//	r.Mount("/products", products.Routes(deps, logger))
+//	r.Mount("/admin", admin.Routes(deps, logger))
+//
+//	// Health check endpoint
+//	health.Mount(r, healthChecks, logger)
+//
+//	return r, nil
+func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) (http.Handler, error) {
+	// router.New returns a chi-based router pre-wired with WAFFLE's
+	// standard middleware stack. You can add additional middleware
+	// or mount feature routers as your application grows.
+	r := router.New(coreCfg, logger)
+
+	// Example route — replace with your own feature routers as the app grows.
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(appCfg.Greeting))
+	})
+
+	// Optional: Mount health check endpoint with app-specific probes.
+	// Health checks let load balancers and orchestrators verify your app is ready.
+	//
+	// checks := map[string]health.Check{
+	//     "db": func(ctx context.Context) error {
+	//         return deps.MongoClient.Ping(ctx, nil)
+	//     },
+	// }
+	// health.Mount(r, checks, logger)
+
+	// Optional: Mount pprof endpoints for profiling.
+	// Consider protecting these in production or enabling only in development.
+	//
+	// if coreCfg.Env == "dev" {
+	//     pprof.Mount(r)
+	// }
+
+	// Optional: Mount metrics endpoint for Prometheus scraping.
+	// The metrics are already being collected by WAFFLE's middleware.
+	//
+	// r.Handle("/metrics", metrics.Handler())
+
+	return r, nil
+}

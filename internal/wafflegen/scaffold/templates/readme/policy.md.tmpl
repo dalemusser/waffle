@@ -1,0 +1,152 @@
+# Policy Directory
+
+This directory contains **authorization and business rule logic** for your WAFFLE application.
+
+## Purpose
+
+The policy directory centralizes all authorization decisions and business rules, keeping them separate from HTTP handlers and data access code. This provides:
+
+- **Single source of truth** for access control decisions
+- **Consistent enforcement** across all features
+- **Easy auditing** of security rules
+- **Testable business logic** independent of HTTP layer
+
+## What Belongs Here
+
+- **Authorization checks** — Who can do what?
+- **Business rules** — Validation logic beyond simple field validation
+- **Access policies** — Role-based or attribute-based access control
+- **Rate limiting rules** — Usage quotas and limits
+
+## Example Structure
+
+```
+policy/
+├── authz/
+│   ├── roles.go          # Role definitions
+│   ├── permissions.go    # Permission checks
+│   └── middleware.go     # Authorization middleware
+├── rules/
+│   ├── order.go          # Order business rules
+│   └── user.go           # User business rules
+└── limits/
+    └── rate.go           # Rate limiting policies
+```
+
+## Usage Example
+
+Define authorization policies:
+
+```go
+// policy/authz/permissions.go
+package authz
+
+import "{{.Module}}/internal/domain/models"
+
+type Permission string
+
+const (
+    PermViewUsers   Permission = "users:view"
+    PermEditUsers   Permission = "users:edit"
+    PermDeleteUsers Permission = "users:delete"
+    PermViewAdmin   Permission = "admin:view"
+)
+
+// CanAccess checks if a user has the required permission.
+func CanAccess(user *models.User, perm Permission) bool {
+    if user == nil {
+        return false
+    }
+    for _, p := range user.Permissions {
+        if Permission(p) == perm {
+            return true
+        }
+    }
+    return false
+}
+
+// RequirePermission returns middleware that enforces a permission.
+func RequirePermission(perm Permission) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            user := GetUserFromContext(r.Context())
+            if !CanAccess(user, perm) {
+                http.Error(w, "Forbidden", http.StatusForbidden)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+Define business rules:
+
+```go
+// policy/rules/order.go
+package rules
+
+import (
+    "errors"
+    "{{.Module}}/internal/domain/models"
+)
+
+var (
+    ErrOrderTooLarge    = errors.New("order exceeds maximum items")
+    ErrInsufficientStock = errors.New("insufficient stock for order")
+)
+
+const MaxOrderItems = 100
+
+// ValidateOrder checks business rules for an order.
+func ValidateOrder(order *models.Order, stock map[string]int) error {
+    if len(order.Items) > MaxOrderItems {
+        return ErrOrderTooLarge
+    }
+
+    for _, item := range order.Items {
+        if stock[item.ProductID] < item.Quantity {
+            return ErrInsufficientStock
+        }
+    }
+
+    return nil
+}
+```
+
+## Using Policies in Handlers
+
+```go
+// features/admin/routes.go
+package admin
+
+import (
+    "{{.Module}}/internal/app/policy/authz"
+    "github.com/go-chi/chi/v5"
+)
+
+func Routes() chi.Router {
+    r := chi.NewRouter()
+
+    // All admin routes require admin:view permission
+    r.Use(authz.RequirePermission(authz.PermViewAdmin))
+
+    r.Get("/dashboard", dashboardHandler)
+
+    // User management requires additional permission
+    r.Group(func(r chi.Router) {
+        r.Use(authz.RequirePermission(authz.PermEditUsers))
+        r.Post("/users", createUserHandler)
+        r.Put("/users/{id}", updateUserHandler)
+    })
+
+    return r
+}
+```
+
+## Guidelines
+
+- Keep policies pure (no database access) when possible
+- Return descriptive errors that can be logged or shown to users
+- Write tests for critical authorization paths
+- Consider using constants for permission names to avoid typos

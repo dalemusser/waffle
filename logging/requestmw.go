@@ -3,6 +3,7 @@ package logging
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -19,11 +20,23 @@ func RequestLogger(logger *zap.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			// Default to HTTP/1.x if ProtoMajor is invalid (e.g., malformed request).
+			protoMajor := r.ProtoMajor
+			if protoMajor < 1 {
+				protoMajor = 1
+			}
+			ww := middleware.NewWrapResponseWriter(w, protoMajor)
 
 			next.ServeHTTP(ww, r)
 
 			latency := time.Since(start)
+
+			// Normalize status code for logging consistency with metrics middleware.
+			// Status 0 means WriteHeader was never called (implies 200 OK).
+			statusCode := ww.Status()
+			if statusCode == 0 {
+				statusCode = http.StatusOK
+			}
 
 			logger.Info("http_request",
 				zap.String("method", r.Method),
@@ -31,7 +44,7 @@ func RequestLogger(logger *zap.Logger) func(next http.Handler) http.Handler {
 				zap.String("host", r.Host),
 				zap.String("scheme", schemeFromRequest(r)),
 				zap.String("proto", r.Proto),
-				zap.Int("status", ww.Status()),
+				zap.Int("status", statusCode),
 				zap.Int("bytes", ww.BytesWritten()),
 				zap.String("remote_ip", r.RemoteAddr),
 				zap.String("user_agent", r.UserAgent()),
@@ -48,7 +61,13 @@ func schemeFromRequest(r *http.Request) string {
 		return "https"
 	}
 	if xf := r.Header.Get("X-Forwarded-Proto"); xf != "" {
-		return xf
+		// Validate the header value to prevent injection of arbitrary schemes.
+		// Only accept "http" or "https" (case-insensitive).
+		xf = strings.ToLower(strings.TrimSpace(xf))
+		if xf == "https" || xf == "http" {
+			return xf
+		}
+		// Invalid value - fall through to default
 	}
 	return "http"
 }

@@ -1,0 +1,53 @@
+// internal/app/bootstrap/config.go
+package bootstrap
+
+import (
+	"github.com/dalemusser/waffle/config"
+	"go.uber.org/zap"
+)
+
+// LoadConfig loads WAFFLE core config and app-specific config.
+//
+// It is called early in startup so that both WAFFLE and the app have
+// access to configuration before any backends or handlers are built.
+// CoreConfig comes from the shared WAFFLE layer; AppConfig is specific
+// to this app and can be extended as the app grows.
+//
+// WAFFLE's config.Load handles:
+//   - Loading from .env files
+//   - Loading from config.yaml/json/toml files
+//   - Reading environment variables (WAFFLE_* prefix)
+//   - Parsing command-line flags
+//   - Merging with precedence: flags > env > files > defaults
+//
+// After loading CoreConfig, this function should load any app-specific
+// configuration into AppConfig. You can use Viper, environment variables,
+// or any other method that suits your needs.
+func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
+	coreCfg, err := config.Load(logger)
+	if err != nil {
+		return nil, AppConfig{}, err
+	}
+
+	appCfg := AppConfig{
+		Greeting: "Hello from WAFFLE!",
+	}
+
+	return coreCfg, appCfg, nil
+}
+
+// ValidateConfig performs optional app-specific config validation.
+//
+// Return nil to accept the loaded config, or an error to abort startup.
+// This is the right place to enforce required fields or invariants that
+// involve both the core and app configs.
+//
+// Examples of validation you might perform here:
+//   - Ensure required API keys are present
+//   - Validate that URLs are well-formed
+//   - Check that numeric values are within acceptable ranges
+//   - Verify that dependent config options are consistent
+func ValidateConfig(coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) error {
+	// Add any additional app-specific config validation here.
+	return nil
+}

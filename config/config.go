@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // HTTPConfig groups HTTP/HTTPS port and protocol settings.
@@ -20,6 +22,13 @@ type HTTPConfig struct {
 	HTTPPort  int  `mapstructure:"http_port"`
 	HTTPSPort int  `mapstructure:"https_port"`
 	UseHTTPS  bool `mapstructure:"use_https"`
+
+	// Server timeouts
+	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
+	ReadHeaderTimeout time.Duration `mapstructure:"read_header_timeout"`
+	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
+	ShutdownTimeout   time.Duration `mapstructure:"shutdown_timeout"`
 }
 
 // TLSConfig groups all TLS / ACME-related settings.
@@ -40,6 +49,12 @@ type TLSConfig struct {
 	// Route53HostedZoneID is required when using DNS-01 with Route 53 so the
 	// ACME client knows which hosted zone to update.
 	Route53HostedZoneID string `mapstructure:"route53_hosted_zone_id"`
+
+	// ACMEDirectoryURL is the ACME directory URL to use. Defaults to Let's Encrypt
+	// production for prod env, staging for other environments. Common values:
+	//   - Production: https://acme-v02.api.letsencrypt.org/directory
+	//   - Staging:    https://acme-staging-v02.api.letsencrypt.org/directory
+	ACMEDirectoryURL string `mapstructure:"acme_directory_url"`
 }
 
 // CORSConfig groups all CORS behavior and lists.
@@ -73,6 +88,7 @@ type CoreConfig struct {
 
 	// misc
 	EnableCompression bool `mapstructure:"enable_compression"`
+	CompressionLevel  int  `mapstructure:"compression_level"` // 1-9, default 5
 }
 
 // Dump returns a pretty, redacted JSON string of the config for debugging.
@@ -115,13 +131,22 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	pflag.String("domain", "", "Domain for TLS or ACME")
 	pflag.String("lets_encrypt_challenge", "http-01", "ACME challenge type: http-01 or dns-01")
 	pflag.String("route53_hosted_zone_id", "", "Route53 hosted zone ID (for dns-01)")
+	pflag.String("acme_directory_url", "", "ACME directory URL (defaults to Let's Encrypt staging/prod based on env)")
 
-	// Timeouts
+	// DB Timeouts
 	pflag.String("index_boot_timeout", "120s", "Startup timeout for building DB indexes (e.g., \"90s\", \"2m\")")
 	pflag.String("db_connect_timeout", "10s", "Startup timeout for DB connection (e.g., \"10s\", \"30s\")")
 
+	// HTTP Server Timeouts
+	pflag.String("read_timeout", "15s", "HTTP server read timeout (e.g., \"15s\", \"30s\")")
+	pflag.String("read_header_timeout", "10s", "HTTP server read header timeout (e.g., \"10s\")")
+	pflag.String("write_timeout", "60s", "HTTP server write timeout (e.g., \"60s\", \"2m\")")
+	pflag.String("idle_timeout", "120s", "HTTP server idle timeout (e.g., \"120s\", \"2m\")")
+	pflag.String("shutdown_timeout", "15s", "Graceful shutdown timeout (e.g., \"15s\", \"30s\")")
+
 	// misc / CORS
 	pflag.Bool("enable_compression", true, "Enable HTTP compression")
+	pflag.Int("compression_level", 5, "Compression level (1=fastest, 9=best compression)")
 	pflag.Bool("enable_cors", false, "Enable CORS")
 
 	// CORS lists as JSON strings or arrays
@@ -132,7 +157,7 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	pflag.Bool("cors_allow_credentials", false, "CORS: allow credentials")
 	pflag.Int("cors_max_age", 0, "CORS: max age seconds (0 disables cache)")
 
-	pflag.Int64("max_request_body_bytes", 2<<20, "Max HTTP request body size in bytes (0 = unlimited)")
+	pflag.Int64("max_request_body_bytes", 2<<20, "Max HTTP request body size in bytes (0 = no limit, -1 = reject all)")
 	pflag.Parse()
 
 	// 2) Viper + env
@@ -212,7 +237,31 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	}
 	cfg.DBConnectTimeout = dbDur
 
-	// 8) Validate
+	// Parse HTTP server timeouts
+	cfg.HTTP.ReadTimeout = parseDurationWithDefault(logger, v, "read_timeout", 15*time.Second)
+	cfg.HTTP.ReadHeaderTimeout = parseDurationWithDefault(logger, v, "read_header_timeout", 10*time.Second)
+	cfg.HTTP.WriteTimeout = parseDurationWithDefault(logger, v, "write_timeout", 60*time.Second)
+	cfg.HTTP.IdleTimeout = parseDurationWithDefault(logger, v, "idle_timeout", 120*time.Second)
+	cfg.HTTP.ShutdownTimeout = parseDurationWithDefault(logger, v, "shutdown_timeout", 15*time.Second)
+
+	// Set ACME directory URL default based on environment if not explicitly configured
+	if cfg.TLS.UseLetsEncrypt && cfg.TLS.ACMEDirectoryURL == "" {
+		if cfg.Env == "prod" {
+			cfg.TLS.ACMEDirectoryURL = "https://acme-v02.api.letsencrypt.org/directory"
+		} else {
+			cfg.TLS.ACMEDirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+			if logger != nil {
+				logger.Info("using Let's Encrypt staging (non-prod env); set acme_directory_url for production")
+			}
+		}
+	}
+
+	// 8) Normalize values before validation so validators see canonical forms.
+	// LetsEncryptChallenge is case-insensitive but should be lowercase
+	// for consistent comparisons in validation and server code.
+	cfg.TLS.LetsEncryptChallenge = strings.ToLower(strings.TrimSpace(cfg.TLS.LetsEncryptChallenge))
+
+	// 9) Validate
 	if err := validateCoreConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -224,11 +273,12 @@ func allKeys() []string {
 	return []string{
 		"env", "log_level",
 		"http_port", "https_port", "use_https",
+		"read_timeout", "read_header_timeout", "write_timeout", "idle_timeout", "shutdown_timeout",
 		"use_lets_encrypt", "lets_encrypt_email", "lets_encrypt_cache_dir",
 		"cert_file", "key_file", "domain",
-		"lets_encrypt_challenge", "route53_hosted_zone_id",
+		"lets_encrypt_challenge", "route53_hosted_zone_id", "acme_directory_url",
 		"db_connect_timeout", "index_boot_timeout",
-		"enable_compression",
+		"enable_compression", "compression_level",
 		"enable_cors",
 		"cors_allowed_origins", "cors_allowed_methods", "cors_allowed_headers",
 		"cors_exposed_headers", "cors_allow_credentials", "cors_max_age",
@@ -244,6 +294,13 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("https_port", 443)
 	v.SetDefault("use_https", false)
 
+	// HTTP server timeouts
+	v.SetDefault("read_timeout", "15s")
+	v.SetDefault("read_header_timeout", "10s")
+	v.SetDefault("write_timeout", "60s")
+	v.SetDefault("idle_timeout", "120s")
+	v.SetDefault("shutdown_timeout", "15s")
+
 	v.SetDefault("use_lets_encrypt", false)
 	v.SetDefault("lets_encrypt_email", "")
 	v.SetDefault("lets_encrypt_cache_dir", "letsencrypt-cache")
@@ -252,11 +309,13 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("domain", "")
 	v.SetDefault("lets_encrypt_challenge", "http-01")
 	v.SetDefault("route53_hosted_zone_id", "")
+	v.SetDefault("acme_directory_url", "") // Empty means auto-detect based on env
 
 	v.SetDefault("db_connect_timeout", "10s")
 	v.SetDefault("index_boot_timeout", "120s")
 
 	v.SetDefault("enable_compression", true)
+	v.SetDefault("compression_level", 5)
 
 	// Neutral CORS defaults
 	v.SetDefault("enable_cors", false)
@@ -278,6 +337,8 @@ func normalizeListKeys(logger *zap.Logger, v *viper.Viper, keys ...string) error
 		case string:
 			s := strings.TrimSpace(t)
 			if s == "" {
+				// Empty string should be normalized to empty slice for consistency
+				v.Set(key, []string{})
 				continue
 			}
 			var arr []string
@@ -287,8 +348,20 @@ func normalizeListKeys(logger *zap.Logger, v *viper.Viper, keys ...string) error
 			v.Set(key, arr)
 		case []interface{}:
 			arr := make([]string, 0, len(t))
-			for _, e := range t {
-				arr = append(arr, fmt.Sprint(e))
+			for i, e := range t {
+				s, ok := e.(string)
+				if !ok {
+					// Non-string element in array - warn and coerce
+					if logger != nil {
+						logger.Warn("non-string element in config array, coercing to string",
+							zap.String("key", key),
+							zap.Int("index", i),
+							zap.Any("value", e),
+							zap.String("type", fmt.Sprintf("%T", e)))
+					}
+					s = fmt.Sprint(e)
+				}
+				arr = append(arr, s)
 			}
 			v.Set(key, arr)
 		case []string, nil:
@@ -307,6 +380,14 @@ func validateCoreConfig(cfg CoreConfig) error {
 	var missing []string
 	var invalid []string
 
+	// Log level validation (case-insensitive)
+	if cfg.LogLevel != "" {
+		var level zapcore.Level
+		if err := level.UnmarshalText([]byte(strings.ToLower(cfg.LogLevel))); err != nil {
+			invalid = append(invalid, fmt.Sprintf("log_level %q is invalid; valid levels: debug, info, warn, error, dpanic, panic, fatal", cfg.LogLevel))
+		}
+	}
+
 	// TLS / ACME consistency
 	if cfg.TLS.UseLetsEncrypt && !cfg.HTTP.UseHTTPS {
 		invalid = append(invalid, "use_lets_encrypt=true requires use_https=true")
@@ -321,8 +402,8 @@ func validateCoreConfig(cfg CoreConfig) error {
 		}
 		if s := strings.TrimSpace(cfg.TLS.LetsEncryptEmail); s == "" {
 			missing = append(missing, "WAFFLE_LETS_ENCRYPT_EMAIL (or --lets_encrypt_email)")
-		} else if !strings.Contains(cfg.TLS.LetsEncryptEmail, "@") {
-			invalid = append(invalid, "lets_encrypt_email must look like an email address")
+		} else if !isValidEmail(cfg.TLS.LetsEncryptEmail) {
+			invalid = append(invalid, "lets_encrypt_email must be a valid email address (e.g., user@example.com)")
 		}
 
 		chal := strings.ToLower(strings.TrimSpace(cfg.TLS.LetsEncryptChallenge))
@@ -331,6 +412,21 @@ func validateCoreConfig(cfg CoreConfig) error {
 		}
 		if chal == "dns-01" && strings.TrimSpace(cfg.TLS.Route53HostedZoneID) == "" {
 			missing = append(missing, "WAFFLE_ROUTE53_HOSTED_ZONE_ID (or --route53_hosted_zone_id) for dns-01")
+		}
+
+		// Validate ACME directory URL format if explicitly provided.
+		// Note: We only validate URL format here, not reachability. Network
+		// connectivity is checked at runtime when the ACME client initializes,
+		// which provides better error messages in context.
+		if cfg.TLS.ACMEDirectoryURL != "" {
+			u, err := url.Parse(cfg.TLS.ACMEDirectoryURL)
+			if err != nil {
+				invalid = append(invalid, fmt.Sprintf("acme_directory_url is not a valid URL: %v", err))
+			} else if u.Scheme != "https" {
+				invalid = append(invalid, "acme_directory_url must use HTTPS scheme")
+			} else if u.Host == "" {
+				invalid = append(invalid, "acme_directory_url must include a host")
+			}
 		}
 	}
 
@@ -365,14 +461,41 @@ func validateCoreConfig(cfg CoreConfig) error {
 		if len(cfg.CORS.CORSAllowedMethods) == 0 {
 			missing = append(missing, "CORS: cors_allowed_methods (JSON array) required when enable_cors=true")
 		}
+		// Validate HTTP methods
+		validMethods := map[string]bool{
+			"GET": true, "POST": true, "PUT": true, "DELETE": true,
+			"PATCH": true, "HEAD": true, "OPTIONS": true, "TRACE": true, "CONNECT": true,
+		}
+		for _, method := range cfg.CORS.CORSAllowedMethods {
+			if !validMethods[strings.ToUpper(method)] {
+				invalid = append(invalid, fmt.Sprintf("CORS: invalid HTTP method %q", method))
+			}
+		}
 		for _, o := range cfg.CORS.CORSAllowedOrigins {
-			if o == "*" && cfg.CORS.CORSAllowCredentials {
-				invalid = append(invalid, `CORS: cannot use "*" in cors_allowed_origins when cors_allow_credentials=true`)
-				break
+			if o == "*" {
+				if cfg.CORS.CORSAllowCredentials {
+					invalid = append(invalid, `CORS: cannot use "*" in cors_allowed_origins when cors_allow_credentials=true`)
+				}
+				continue
+			}
+			// Validate non-wildcard origins are proper URLs with scheme
+			parsed, err := url.Parse(o)
+			if err != nil {
+				invalid = append(invalid, fmt.Sprintf("CORS: invalid origin URL %q: %v", o, err))
+			} else if parsed.Scheme == "" || parsed.Host == "" {
+				invalid = append(invalid, fmt.Sprintf("CORS: origin %q must be a full URL with scheme (e.g., https://example.com)", o))
+			} else if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				invalid = append(invalid, fmt.Sprintf("CORS: origin %q has invalid scheme %q (must be http or https)", o, parsed.Scheme))
 			}
 		}
 		if cfg.CORS.CORSMaxAge < 0 {
 			invalid = append(invalid, "CORS: cors_max_age must be >= 0")
+		}
+		// Most browsers cap max-age (Chrome: 2 hours, Firefox: 24 hours).
+		// Values beyond a week are almost certainly configuration errors.
+		const maxCORSMaxAge = 7 * 24 * 60 * 60 // 1 week in seconds
+		if cfg.CORS.CORSMaxAge > maxCORSMaxAge {
+			invalid = append(invalid, fmt.Sprintf("CORS: cors_max_age %d exceeds maximum of %d seconds (1 week)", cfg.CORS.CORSMaxAge, maxCORSMaxAge))
 		}
 	}
 
@@ -382,6 +505,41 @@ func validateCoreConfig(cfg CoreConfig) error {
 	}
 	if cfg.IndexBootTimeout <= 0 {
 		invalid = append(invalid, "index_boot_timeout must be > 0")
+	}
+
+	// Compression level sanity - validate even if disabled to catch config errors early
+	if cfg.CompressionLevel != 0 && (cfg.CompressionLevel < 1 || cfg.CompressionLevel > 9) {
+		invalid = append(invalid, "compression_level must be between 1 and 9 (or 0 for default)")
+	}
+
+	// MaxRequestBodyBytes validation: negative values other than -1 are invalid.
+	// -1 means reject all request bodies, 0 means no limit, positive means limit.
+	if cfg.MaxRequestBodyBytes < -1 {
+		invalid = append(invalid, "max_request_body_bytes must be >= -1 (-1 = reject all, 0 = no limit)")
+	}
+
+	// HTTP timeout sanity checks
+	if cfg.HTTP.ReadTimeout <= 0 {
+		invalid = append(invalid, "read_timeout must be > 0")
+	}
+	if cfg.HTTP.ReadHeaderTimeout <= 0 {
+		invalid = append(invalid, "read_header_timeout must be > 0 (required for Slowloris protection)")
+	}
+	if cfg.HTTP.WriteTimeout <= 0 {
+		invalid = append(invalid, "write_timeout must be > 0")
+	}
+	if cfg.HTTP.IdleTimeout <= 0 {
+		invalid = append(invalid, "idle_timeout must be > 0")
+	}
+	if cfg.HTTP.ShutdownTimeout <= 0 {
+		invalid = append(invalid, "shutdown_timeout must be > 0")
+	}
+
+	// Timeout consistency: read_header_timeout should not exceed read_timeout
+	if cfg.HTTP.ReadHeaderTimeout > 0 && cfg.HTTP.ReadTimeout > 0 {
+		if cfg.HTTP.ReadHeaderTimeout > cfg.HTTP.ReadTimeout {
+			invalid = append(invalid, "read_header_timeout should not exceed read_timeout")
+		}
 	}
 
 	if len(missing) == 0 && len(invalid) == 0 {
@@ -400,3 +558,67 @@ func validateCoreConfig(cfg CoreConfig) error {
 
 // validateMongoURI is left out here on purpose; CoreConfig does not know about URIs.
 // Apps can bring their own DB config validation as needed.
+
+// isValidEmail performs basic email validation for ACME account registration.
+// It checks for:
+// - Non-empty local part and domain
+// - Exactly one @ symbol
+// - Domain has at least one dot
+// - Local part length <= 64, domain length <= 255 (RFC 5321 limits)
+// - Domain doesn't start/end with dot or hyphen
+// - No spaces or control characters
+//
+// This is intentionally not RFC 5322 compliant but catches common mistakes.
+//
+// Note: This is more thorough than pantry/validate.SimpleEmailValid, which only
+// checks for @ and a dot in the domain. This stricter validation is appropriate
+// for ACME registration where a valid, routable email is required for account
+// recovery. For general-purpose UI validation where leniency is preferred,
+// consider using SimpleEmailValid instead.
+func isValidEmail(email string) bool {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return false
+	}
+
+	// Must have exactly one @
+	atIdx := strings.Index(email, "@")
+	if atIdx == -1 || atIdx == 0 || atIdx == len(email)-1 {
+		return false
+	}
+	// Check for multiple @
+	if strings.Count(email, "@") > 1 {
+		return false
+	}
+
+	local := email[:atIdx]
+	domain := email[atIdx+1:]
+
+	// Local part checks
+	if len(local) == 0 || len(local) > 64 {
+		return false
+	}
+
+	// Domain checks
+	if len(domain) == 0 || len(domain) > 255 {
+		return false
+	}
+	// Domain must have at least one dot (e.g., example.com)
+	if !strings.Contains(domain, ".") {
+		return false
+	}
+	// Domain can't start or end with a dot or hyphen
+	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") ||
+		strings.HasPrefix(domain, "-") || strings.HasSuffix(domain, "-") {
+		return false
+	}
+
+	// No spaces or control characters in email
+	for _, c := range email {
+		if c <= 0x20 || c == 0x7f {
+			return false
+		}
+	}
+
+	return true
+}

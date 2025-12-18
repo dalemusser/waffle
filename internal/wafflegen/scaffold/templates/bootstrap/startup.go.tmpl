@@ -1,0 +1,45 @@
+// internal/app/bootstrap/startup.go
+package bootstrap
+
+import (
+	"context"
+
+	"github.com/dalemusser/waffle/config"
+	"go.uber.org/zap"
+)
+
+// Startup runs once after DB connections and schema/index setup are complete,
+// but before the HTTP handler is built and requests are served.
+//
+// This is the place for one-time initialization that depends on having live
+// database connections and fully loaded configuration. Unlike ConnectDB and
+// EnsureSchema which focus on infrastructure, Startup is for application-level
+// initialization.
+//
+// Common uses for Startup:
+//   - Load shared templates from the resources directory
+//   - Warm caches with frequently accessed data
+//   - Initialize in-memory lookup tables
+//   - Validate external service connectivity
+//   - Set up background workers or scheduled tasks
+//   - Perform health checks on dependencies
+//
+// Example loading shared templates:
+//
+//	resources.LoadSharedTemplates()
+//	logger.Info("shared templates loaded")
+//	return nil
+//
+// Returning a non-nil error will abort startup and prevent the server from
+// starting. Returning nil signals that initialization succeeded.
+//
+// The context will be cancelled if the process is asked to shut down while
+// Startup is running; honor it in any long-running work.
+func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+	// TODO: Add any application-specific startup initialization here.
+	// Examples:
+	// - resources.LoadSharedTemplates()
+	// - cache.Warm(ctx, deps.MongoDB)
+	// - scheduler.Start(ctx, logger)
+	return nil
+}

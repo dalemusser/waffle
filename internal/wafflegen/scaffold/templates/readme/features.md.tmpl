@@ -1,0 +1,88 @@
+# Features Directory
+
+This directory contains **feature modules** for your WAFFLE application.
+
+## What is a Feature?
+
+A feature is a self-contained module that handles a specific area of functionality in your application. Each feature typically includes:
+
+- **routes.go** — HTTP route definitions and handlers
+- **templates.go** — Template registration for the feature
+- **templates/** — HTML templates (`.gohtml` files)
+- **handlers.go** — Request handler functions (if separated from routes)
+- **models.go** — Feature-specific data structures (if not in domain/models)
+
+## Example Structure
+
+```
+features/
+├── about/
+│   ├── routes.go
+│   ├── templates.go
+│   └── templates/
+│       └── about.gohtml
+├── users/
+│   ├── routes.go
+│   ├── handlers.go
+│   ├── templates.go
+│   └── templates/
+│       ├── list.gohtml
+│       ├── detail.gohtml
+│       └── form.gohtml
+└── admin/
+    ├── routes.go
+    ├── middleware.go
+    ├── templates.go
+    └── templates/
+        └── dashboard.gohtml
+```
+
+## Creating a Feature
+
+1. Create a new directory under `features/` with your feature name
+2. Create `routes.go` that returns a `chi.Router`:
+
+```go
+package myfeature
+
+import (
+    "github.com/go-chi/chi/v5"
+)
+
+func Routes() chi.Router {
+    r := chi.NewRouter()
+    r.Get("/", listHandler)
+    r.Get("/{id}", detailHandler)
+    return r
+}
+```
+
+3. Mount the feature in `bootstrap/routes.go`:
+
+```go
+r.Mount("/myfeature", myfeature.Routes())
+```
+
+## Template Registration
+
+If your feature has templates, create `templates.go`:
+
+```go
+package myfeature
+
+import (
+    "embed"
+    "github.com/dalemusser/waffle/templates"
+)
+
+//go:embed templates/*.gohtml
+var FS embed.FS
+
+func init() {
+    templates.Register(templates.Set{
+        Name:     "myfeature",
+        FS:       FS,
+        Patterns: []string{"templates/*.gohtml"},
+    })
+}
+```

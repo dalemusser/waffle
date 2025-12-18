@@ -1,0 +1,109 @@
+# Store Directory
+
+This directory contains the **data persistence layer** for your WAFFLE application.
+
+## Purpose
+
+The store directory implements the **repository pattern**, providing a clean interface between your application logic and database operations. Each store handles data access for a specific domain entity or aggregate.
+
+## Benefits of the Repository Pattern
+
+- **Separation of concerns** — Business logic doesn't know about database details
+- **Testability** — Easy to mock stores for unit testing
+- **Flexibility** — Swap database implementations without changing business logic
+- **Consistency** — Centralized place for all data access code
+
+## Example Structure
+
+```
+store/
+├── user/
+│   ├── store.go          # UserStore interface and implementation
+│   └── queries.go        # Complex query builders
+├── product/
+│   ├── store.go
+│   └── search.go         # Product search functionality
+├── order/
+│   └── store.go
+└── store.go              # Common interfaces or store registry
+```
+
+## Usage Example
+
+Define a store interface and implementation:
+
+```go
+// store/user/store.go
+package user
+
+import (
+    "context"
+    "{{.Module}}/internal/domain/models"
+    "go.mongodb.org/mongo-driver/mongo"
+)
+
+type Store interface {
+    FindByID(ctx context.Context, id string) (*models.User, error)
+    FindByEmail(ctx context.Context, email string) (*models.User, error)
+    Create(ctx context.Context, user *models.User) error
+    Update(ctx context.Context, user *models.User) error
+    Delete(ctx context.Context, id string) error
+    List(ctx context.Context, page, pageSize int) ([]*models.User, int64, error)
+}
+
+type mongoStore struct {
+    coll *mongo.Collection
+}
+
+func NewMongoStore(db *mongo.Database) Store {
+    return &mongoStore{
+        coll: db.Collection("users"),
+    }
+}
+
+func (s *mongoStore) FindByID(ctx context.Context, id string) (*models.User, error) {
+    // Implementation...
+}
+```
+
+## Wiring Stores
+
+Add stores to DBDeps in `bootstrap/dbdeps.go`:
+
+```go
+type DBDeps struct {
+    MongoClient *mongo.Client
+    MongoDB     *mongo.Database
+
+    // Stores
+    UserStore    user.Store
+    ProductStore product.Store
+}
+```
+
+Initialize stores in `bootstrap/db.go`:
+
+```go
+func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) (DBDeps, error) {
+    client, err := mongo.Connect(ctx, options.Client().ApplyURI(appCfg.MongoURI))
+    if err != nil {
+        return DBDeps{}, err
+    }
+
+    db := client.Database("myapp")
+
+    return DBDeps{
+        MongoClient:  client,
+        MongoDB:      db,
+        UserStore:    user.NewMongoStore(db),
+        ProductStore: product.NewMongoStore(db),
+    }, nil
+}
+```
+
+## Guidelines
+
+- One store per domain entity or aggregate root
+- Use interfaces to allow for mocking in tests
+- Keep database-specific code isolated within store implementations
+- Handle errors consistently and wrap with context

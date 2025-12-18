@@ -1,13 +1,48 @@
 package wafflegen
 
 import (
+	"bytes"
+	"embed"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
+
+//go:embed scaffold
+var scaffoldFS embed.FS
+
+// Manifest represents the structure defined in manifest.yaml.
+type Manifest struct {
+	Directories []DirectoryEntry `yaml:"directories"`
+	Files       []FileEntry      `yaml:"files"`
+}
+
+// DirectoryEntry represents a directory to create.
+type DirectoryEntry struct {
+	Path   string `yaml:"path"`
+	Readme string `yaml:"readme,omitempty"`
+}
+
+// FileEntry represents a file to create from a template.
+type FileEntry struct {
+	Path     string `yaml:"path"`
+	Template string `yaml:"template"`
+}
+
+// TemplateData is passed to all templates during execution.
+type TemplateData struct {
+	AppName       string
+	Module        string
+	GoVersion     string
+	WaffleVersion string
+}
 
 // Run is the shared entrypoint used by both wafflectl and makewaffle.
 //
@@ -42,15 +77,23 @@ func usage(binName string) {
 	fmt.Println("Usage:")
 	fmt.Printf("  %s new <appname> --module <module-path>\n", binName)
 	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  --module         Go module path for the new app (required)")
+	fmt.Println("  --waffle-version Version of waffle to require (optional)")
+	fmt.Println("  --go-version     Go language version (default: 1.21)")
+	fmt.Println("  --template       Template to use: full (default: full)")
+	fmt.Println("  --force          Scaffold into existing directory")
+	fmt.Println()
 	fmt.Println("Example:")
-	fmt.Printf("  %s new strata_hub --module github.com/dalemusser/strata_hub\n", binName)
+	fmt.Printf("  %s new myapp --module github.com/you/myapp\n", binName)
 }
 
 func newCmd(binName string, args []string) int {
 	fs := flag.NewFlagSet("new", flag.ExitOnError)
-	module := fs.String("module", "", "Go module path for the new app (e.g. github.com/you/hello_waffle)")
+	module := fs.String("module", "", "Go module path for the new app (e.g. github.com/you/myapp)")
 	waffleVersion := fs.String("waffle-version", "", "Version of github.com/dalemusser/waffle to require in go.mod (e.g. v0.1.0)")
 	goVersion := fs.String("go-version", "1.21", "Go language version to declare in go.mod (e.g. 1.21)")
+	templateName := fs.String("template", "full", "Template to use: full")
 	force := fs.Bool("force", false, "Scaffold into an existing app directory if it already exists")
 	fs.Usage = func() {
 		fmt.Printf("Usage: %s new <appname> --module <module-path>\n", binName)
@@ -102,17 +145,29 @@ func newCmd(binName string, args []string) int {
 		return 1
 	}
 
-	if err := scaffoldApp(appName, *module, *waffleVersion, *goVersion, *force); err != nil {
+	// Validate template name
+	if *templateName != "full" {
+		fmt.Printf("error: unknown template %q (available: full)\n", *templateName)
+		return 1
+	}
+
+	if err := scaffoldApp(appName, *module, *waffleVersion, *goVersion, *templateName, *force); err != nil {
 		log.Printf("scaffold failed: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) error {
+func scaffoldApp(appName, module, waffleVersion, goVersion, templateName string, force bool) error {
 	short := appBaseName(appName)
 
 	fmt.Printf("Creating WAFFLE app %q with module %q\n", appName, module)
+
+	// Load manifest
+	manifest, err := loadManifest()
+	if err != nil {
+		return fmt.Errorf("load manifest: %w", err)
+	}
 
 	// Create root directory (or honor --force when it already exists).
 	if err := os.Mkdir(appName, 0o755); err != nil {
@@ -123,51 +178,69 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) e
 		// If it exists and force is true, continue and scaffold into it.
 	}
 
+	// Prepare template data
+	data := TemplateData{
+		AppName:       short,
+		Module:        module,
+		GoVersion:     goVersion,
+		WaffleVersion: waffleVersion,
+	}
+
 	// Helper to join paths under app root.
 	join := func(parts ...string) string {
 		return filepath.Join(append([]string{appName}, parts...)...)
 	}
 
-	// go.mod
-	if err := os.WriteFile(join("go.mod"), []byte(goModContent(module, waffleVersion, goVersion)), 0o644); err != nil {
-		return fmt.Errorf("write go.mod: %w", err)
-	}
+	// Create directories
+	for _, dir := range manifest.Directories {
+		// Expand template variables in path
+		dirPath, err := expandPath(dir.Path, data)
+		if err != nil {
+			return fmt.Errorf("expand directory path %q: %w", dir.Path, err)
+		}
 
-	// Directories
-	dirs := []string{
-		filepath.Join("cmd", short),
-		"internal/app/bootstrap",
-		"internal/app/features",
-		"internal/app/store",
-		"internal/app/policy",
-		"internal/domain/models",
-	}
+		if err := os.MkdirAll(join(dirPath), 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", dirPath, err)
+		}
 
-	for _, d := range dirs {
-		if err := os.MkdirAll(join(d), 0o755); err != nil {
-			return fmt.Errorf("mkdir %s: %w", d, err)
+		// Create README if specified
+		if dir.Readme != "" {
+			readmeContent, err := executeTemplate(dir.Readme, data)
+			if err != nil {
+				return fmt.Errorf("execute readme template %q: %w", dir.Readme, err)
+			}
+			readmePath := join(dirPath, "README.md")
+			if err := os.WriteFile(readmePath, []byte(readmeContent), 0o644); err != nil {
+				return fmt.Errorf("write %s: %w", readmePath, err)
+			}
 		}
 	}
 
-	// Files
-	if err := os.WriteFile(join("cmd", short, "main.go"), []byte(mainGoContent(module)), 0o644); err != nil {
-		return fmt.Errorf("write main.go: %w", err)
-	}
+	// Create files from templates
+	for _, file := range manifest.Files {
+		// Expand template variables in path
+		filePath, err := expandPath(file.Path, data)
+		if err != nil {
+			return fmt.Errorf("expand file path %q: %w", file.Path, err)
+		}
 
-	if err := os.WriteFile(join("internal", "app", "bootstrap", "appconfig.go"), []byte(appConfigContent()), 0o644); err != nil {
-		return fmt.Errorf("write appconfig.go: %w", err)
-	}
+		// Execute the template
+		content, err := executeTemplate(file.Template, data)
+		if err != nil {
+			return fmt.Errorf("execute template %q: %w", file.Template, err)
+		}
 
-	if err := os.WriteFile(join("internal", "app", "bootstrap", "dbdeps.go"), []byte(dbDepsContent()), 0o644); err != nil {
-		return fmt.Errorf("write dbdeps.go: %w", err)
-	}
+		// Ensure parent directory exists
+		fullPath := join(filePath)
+		parentDir := filepath.Dir(fullPath)
+		if err := os.MkdirAll(parentDir, 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", parentDir, err)
+		}
 
-	if err := os.WriteFile(join("internal", "app", "bootstrap", "hooks.go"), []byte(hooksContent(appName)), 0o644); err != nil {
-		return fmt.Errorf("write hooks.go: %w", err)
-	}
-
-	if err := os.WriteFile(join("internal", "app", "bootstrap", "startup.go"), []byte(startupContent()), 0o644); err != nil {
-		return fmt.Errorf("write startup.go: %w", err)
+		// Write the file
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", fullPath, err)
+		}
 	}
 
 	fmt.Println("Done!")
@@ -179,6 +252,56 @@ func scaffoldApp(appName, module, waffleVersion, goVersion string, force bool) e
 	fmt.Println("  go to http://localhost:8080 in web browser")
 	fmt.Println()
 	return nil
+}
+
+func loadManifest() (*Manifest, error) {
+	data, err := scaffoldFS.ReadFile("scaffold/manifest.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("read manifest: %w", err)
+	}
+
+	var manifest Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("parse manifest: %w", err)
+	}
+
+	return &manifest, nil
+}
+
+func expandPath(path string, data TemplateData) (string, error) {
+	tmpl, err := template.New("path").Parse(path)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+func executeTemplate(templatePath string, data TemplateData) (string, error) {
+	// Read template from embedded FS
+	fullPath := "scaffold/templates/" + templatePath
+	content, err := fs.ReadFile(scaffoldFS, fullPath)
+	if err != nil {
+		return "", fmt.Errorf("read template %s: %w", fullPath, err)
+	}
+
+	// Parse and execute template
+	tmpl, err := template.New(templatePath).Parse(string(content))
+	if err != nil {
+		return "", fmt.Errorf("parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute template: %w", err)
+	}
+
+	return buf.String(), nil
 }
 
 func appBaseName(appName string) string {
@@ -217,154 +340,4 @@ func validateAppName(name string) error {
 	}
 
 	return nil
-}
-
-func goModContent(module, waffleVersion, goVersion string) string {
-	if goVersion == "" {
-		goVersion = "1.21"
-	}
-
-	// If a WAFFLE version is provided, include it as a require line.
-	if waffleVersion != "" {
-		return fmt.Sprintf(`module %s
-
-go %s
-
-require github.com/dalemusser/waffle %s
-`, module, goVersion, waffleVersion)
-	}
-
-	// Default: leave WAFFLE and other deps to go get / go mod tidy.
-	return fmt.Sprintf(`module %s
-
-go %s
-`, module, goVersion)
-}
-
-func mainGoContent(module string) string {
-	return fmt.Sprintf(`package main
-
-import (
-	"context"
-	"log"
-
-	"github.com/dalemusser/waffle/app"
-	"%s/internal/app/bootstrap"
-)
-
-func main() {
-	if err := app.Run(context.Background(), bootstrap.Hooks); err != nil {
-		log.Fatal(err)
-	}
-}
-`, module)
-}
-
-func appConfigContent() string {
-	return `package bootstrap
-
-// AppConfig holds service-specific configuration for this WAFFLE app.
-// Extend this struct as your app grows.
-type AppConfig struct {
-	Greeting string
-}
-`
-}
-
-func dbDepsContent() string {
-	return `package bootstrap
-
-// DBDeps holds database/back-end dependencies for the app.
-// Extend this struct as your app evolves.
-type DBDeps struct{}
-`
-}
-
-func hooksContent(appName string) string {
-	name := appBaseName(appName)
-
-	const tpl = `package bootstrap
-
-import (
-	"context"
-	"net/http"
-
-	"github.com/dalemusser/waffle/app"
-	"github.com/dalemusser/waffle/config"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
-)
-
-// LoadConfig loads WAFFLE core config and app-specific config.
-func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
-	coreCfg, err := config.Load(logger)
-	if err != nil {
-		return nil, AppConfig{}, err
-	}
-
-	appCfg := AppConfig{
-		Greeting: "Hello from WAFFLE!",
-	}
-
-	return coreCfg, appCfg, nil
-}
-
-// ConnectDB connects to databases or other backends.
-func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) (DBDeps, error) {
-	// TODO: connect to Mongo, Postgres, Redis, etc.
-	return DBDeps{}, nil
-}
-
-// EnsureSchema sets up indexes or schema as needed.
-func EnsureSchema(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
-	// TODO: create indexes, run migrations, etc.
-	return nil
-}
-
-// BuildHandler constructs the HTTP handler for the service.
-func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) (http.Handler, error) {
-	r := chi.NewRouter()
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(appCfg.Greeting))
-	})
-
-	return r, nil
-}
-
-// Hooks wires the app into WAFFLE's lifecycle.
-var Hooks = app.Hooks[AppConfig, DBDeps]{
-	Name:         %q,
-	LoadConfig:   LoadConfig,
-	ConnectDB:    ConnectDB,
-	EnsureSchema: EnsureSchema,
-	Startup:      Startup,
-	BuildHandler: BuildHandler,
-}
-`
-
-	return fmt.Sprintf(tpl, name)
-}
-
-// startupContent generates the bootstrap/startup.go file, which provides
-// a default no-op Startup hook that applications can customize.
-func startupContent() string {
-	return `package bootstrap
-
-import (
-	"context"
-
-	"github.com/dalemusser/waffle/config"
-	"go.uber.org/zap"
-)
-
-// Startup runs one-time application initialization after DB connections and
-// schema setup are complete, but before the HTTP handler is built and
-// requests are served. Use this to load shared templates, warm caches, or
-// perform any app-wide setup that depends on config and backends.
-func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
-	// TODO: perform any application-specific startup work here.
-	return nil
-}
-`
 }

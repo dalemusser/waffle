@@ -1,0 +1,76 @@
+// internal/app/bootstrap/db.go
+package bootstrap
+
+import (
+	"context"
+
+	"github.com/dalemusser/waffle/config"
+	"go.uber.org/zap"
+)
+
+// ConnectDB connects to databases or other backends.
+//
+// WAFFLE calls this after configuration is loaded but before EnsureSchema and
+// Startup. If your app has no external backends yet, you can leave this as-is
+// and simply return an empty DBDeps and nil.
+//
+// This is the place to establish connections to:
+//   - Databases (MongoDB, PostgreSQL, MySQL, SQLite, etc.)
+//   - Caches (Redis, Memcached)
+//   - Message queues (RabbitMQ, Kafka)
+//   - External services that require persistent connections
+//
+// Best practices:
+//   - Use coreCfg.DBConnectTimeout to set connection timeouts
+//   - Log connection attempts and successes for debugging
+//   - Return descriptive errors if connections fail
+//   - Store clients in the DBDeps struct for use in handlers
+//
+// Example MongoDB connection:
+//
+//	client, err := mongo.Connect(ctx, options.Client().ApplyURI(appCfg.MongoURI))
+//	if err != nil {
+//	    return DBDeps{}, fmt.Errorf("mongo connect: %w", err)
+//	}
+//	if err := client.Ping(ctx, nil); err != nil {
+//	    return DBDeps{}, fmt.Errorf("mongo ping: %w", err)
+//	}
+//	logger.Info("connected to MongoDB")
+//	return DBDeps{MongoClient: client}, nil
+func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) (DBDeps, error) {
+	// TODO: Connect to your databases and backends here.
+	// Add connection code as your app grows and requires data persistence.
+	return DBDeps{}, nil
+}
+
+// EnsureSchema sets up indexes or schema as needed.
+//
+// This runs after ConnectDB succeeds but before Startup and before the HTTP
+// handler is built. It is optional—if you do not need indexes or migrations,
+// you can leave this as a no-op that returns nil.
+//
+// This is the place to:
+//   - Create database indexes for query performance
+//   - Run schema migrations
+//   - Validate that required collections/tables exist
+//   - Set up initial data (seed data, default records)
+//
+// The context has a timeout based on coreCfg.IndexBootTimeout, so long-running
+// migrations should respect context cancellation.
+//
+// Example MongoDB index creation:
+//
+//	coll := deps.MongoClient.Database("mydb").Collection("users")
+//	_, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{
+//	    Keys:    bson.D{{"{{"}}Key: "email", Value: 1}},
+//	    Options: options.Index().SetUnique(true),
+//	})
+//	if err != nil {
+//	    return fmt.Errorf("create email index: %w", err)
+//	}
+//	logger.Info("database indexes ensured")
+//	return nil
+func EnsureSchema(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+	// TODO: Create indexes, run migrations, or validate schema here.
+	return nil
+}
