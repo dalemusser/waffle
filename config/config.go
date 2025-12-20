@@ -108,13 +108,38 @@ func (c CoreConfig) redactedCopy() CoreConfig {
 
 // Load merges defaults → config.* file(s) → env vars → explicit flags into one CoreConfig.
 // Final precedence (highest wins): flags(explicit) > env > config > defaults.
+//
+// For apps that need their own config keys, use LoadWithAppConfig instead.
 func Load(logger *zap.Logger) (*CoreConfig, error) {
+	core, _, err := LoadWithAppConfig(logger, "", nil)
+	return core, err
+}
+
+// LoadWithAppConfig loads both WAFFLE core config and app-specific config.
+// It merges defaults → config.* file(s) → env vars → explicit flags.
+// Final precedence (highest wins): flags(explicit) > env > config > defaults.
+//
+// The appEnvPrefix is used for app config environment variables. For example,
+// if appEnvPrefix is "STRATAHUB" and an AppKey has Name "session_name", the
+// environment variable would be "STRATAHUB_SESSION_NAME".
+//
+// Config file keys and CLI flags use the key name directly (e.g., "session_name").
+//
+// Example:
+//
+//	appKeys := []config.AppKey{
+//	    {Name: "mongo_uri", Default: "mongodb://localhost:27017", Desc: "MongoDB connection URI"},
+//	    {Name: "session_name", Default: "myapp-session", Desc: "Session cookie name"},
+//	}
+//	coreCfg, appCfg, err := config.LoadWithAppConfig(logger, "MYAPP", appKeys)
+//	mongoURI := appCfg.String("mongo_uri")
+func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey) (*CoreConfig, AppConfigValues, error) {
 	// 0) Optionally load .env (safe: real env still wins over .env)
 	if err := godotenv.Load(); err == nil && logger != nil {
 		logger.Info("Loaded .env file")
 	}
 
-	// 1) Define flags (only *explicitly set* flags will override)
+	// 1) Define WAFFLE core flags (only *explicitly set* flags will override)
 	pflag.String("env", "dev", `Runtime environment "dev"|"prod"`)
 	pflag.String("log_level", "debug", "Log level")
 
@@ -158,6 +183,12 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	pflag.Int("cors_max_age", 0, "CORS: max age seconds (0 disables cache)")
 
 	pflag.Int64("max_request_body_bytes", 2<<20, "Max HTTP request body size in bytes (0 = no limit, -1 = reject all)")
+
+	// 1b) Register app-specific flags
+	if err := registerAppFlags(appKeys); err != nil {
+		return nil, nil, fmt.Errorf("failed to register app flags: %w", err)
+	}
+
 	pflag.Parse()
 
 	// 2) Viper + env
@@ -213,13 +244,13 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 		"cors_allowed_headers",
 		"cors_exposed_headers",
 	); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// 7) Build struct
 	var cfg CoreConfig
 	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("unable to decode core config: %w", err)
+		return nil, nil, fmt.Errorf("unable to decode core config: %w", err)
 	}
 
 	// Parse durations
@@ -261,12 +292,15 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 	// for consistent comparisons in validation and server code.
 	cfg.TLS.LetsEncryptChallenge = strings.ToLower(strings.TrimSpace(cfg.TLS.LetsEncryptChallenge))
 
-	// 9) Validate
+	// 9) Validate core config
 	if err := validateCoreConfig(cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &cfg, nil
+	// 10) Load app config
+	appCfg := loadAppConfig(logger, v, appEnvPrefix, appKeys)
+
+	return &cfg, appCfg, nil
 }
 
 func allKeys() []string {
