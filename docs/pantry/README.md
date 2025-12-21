@@ -164,6 +164,7 @@ Helpers for HTTP handling and web development.
 |---------|-------------|---------------|
 | **fileserver** | Static file serving (embedded or filesystem) | [fileserver.md](../../pantry/fileserver/fileserver.md) |
 | **httpnav** | HTTP navigation helpers | [httpnav.md](../../pantry/httpnav/httpnav.md) |
+| **query** | Query parameter extraction with trimming and limits | [query.md](../../pantry/query/query.md) |
 | **urlutil** | URL parsing and manipulation | [urlutil.md](../../pantry/urlutil/urlutil.md) |
 
 ---

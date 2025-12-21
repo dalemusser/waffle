@@ -40,6 +40,7 @@
 | **pagination** | Keyset and offset pagination | [pagination.md](../../pantry/pagination/pagination.md) |
 | **pdf** | PDF generation | [pdf.md](../../pantry/pdf/pdf.md) |
 | **pprof** | Go profiling utilities | [pprof.md](../../pantry/pprof/pprof.md) |
+| **query** | Query parameter extraction with trimming and limits | [query.md](../../pantry/query/query.md) |
 | **ratelimit** | Request rate limiting | [ratelimit.md](../../pantry/ratelimit/ratelimit.md) |
 | **requestid** | Request ID generation and propagation | [requestid.md](../../pantry/requestid/requestid.md) |
 | **retry** | Retry logic with backoff | [retry.md](../../pantry/retry/retry.md) |
