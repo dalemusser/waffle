@@ -35,6 +35,7 @@ Foundational thinking about what WAFFLE is and why it exists.
 The WAFFLE framework foundation — concepts that apply regardless of UI paradigm.
 
 - [Configuration](./core/configuration.md) — CoreConfig, AppConfig, Viper
+- [App Config Keys](./core/app-config-keys.md) — Register app-specific config for files, env vars, and CLI flags
 - [Routing](./core/routing.md) — Chi router, middleware, route patterns
 - [Architecture](./core/architecture.md) — Visual diagrams and system design
 - [Operational Endpoints](./core/operational-endpoints.md) — Health, metrics, pprof
@@ -123,6 +124,7 @@ docs/
 │
 ├── core/                 # Framework foundation
 │   ├── configuration.md
+│   ├── app-config-keys.md
 │   ├── routing.md
 │   ├── architecture.md
 │   └── operational-endpoints.md

@@ -35,6 +35,7 @@ See [Architecture](./architecture.md) for visual diagrams of this lifecycle.
 | Document | Description |
 |----------|-------------|
 | [**Configuration**](./configuration.md) | CoreConfig, AppConfig, Viper, environment variables |
+| [**App Config Keys**](./app-config-keys.md) | Register app-specific config for files, env vars, and CLI flags |
 | [**Routing**](./routing.md) | Chi router, BuildHandler, route patterns |
 | [**Operational Endpoints**](./operational-endpoints.md) | Health checks, Prometheus metrics, pprof |
 | [**Architecture**](./architecture.md) | Visual diagrams of WAFFLE concepts |
