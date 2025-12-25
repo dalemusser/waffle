@@ -3,14 +3,19 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -60,6 +65,25 @@ type S3Config struct {
 	// StorageClass sets the default storage class.
 	// Common values: "STANDARD", "REDUCED_REDUNDANCY", "GLACIER", "INTELLIGENT_TIERING"
 	StorageClass string
+
+	// CloudFront configuration (optional).
+	// When configured, PresignedURL uses CloudFront signed URLs instead of S3 presigned URLs.
+
+	// CloudFrontURL is the CloudFront distribution URL (e.g., "https://d1234.cloudfront.net").
+	// If set, enables CloudFront signed URLs.
+	CloudFrontURL string
+
+	// CloudFrontKeyPairID is the CloudFront key pair ID for signing URLs.
+	// Required when CloudFrontURL is set.
+	CloudFrontKeyPairID string
+
+	// CloudFrontPrivateKey is the PEM-encoded RSA private key for signing.
+	// Either this or CloudFrontPrivateKeyPath must be set when CloudFrontURL is set.
+	CloudFrontPrivateKey string
+
+	// CloudFrontPrivateKeyPath is the path to the PEM-encoded RSA private key file.
+	// Either this or CloudFrontPrivateKey must be set when CloudFrontURL is set.
+	CloudFrontPrivateKeyPath string
 }
 
 // S3 is a storage backend that uses Amazon S3 or S3-compatible services.
@@ -72,6 +96,10 @@ type S3 struct {
 	defaultACL           string
 	serverSideEncryption string
 	storageClass         string
+
+	// CloudFront signing (optional)
+	cfURL    string          // CloudFront distribution URL
+	cfSigner *sign.URLSigner // CloudFront URL signer (nil if not configured)
 }
 
 // NewS3 creates a new S3 storage backend.
@@ -136,6 +164,36 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 		}
 	}
 
+	// Initialize CloudFront signer if configured
+	var cfSigner *sign.URLSigner
+	cfURL := cfg.CloudFrontURL
+	if cfURL != "" {
+		if cfg.CloudFrontKeyPairID == "" {
+			return nil, fmt.Errorf("%w: CloudFrontKeyPairID is required when CloudFrontURL is set", ErrInvalidConfig)
+		}
+
+		// Load private key from string or file
+		var keyBytes []byte
+		if cfg.CloudFrontPrivateKey != "" {
+			keyBytes = []byte(cfg.CloudFrontPrivateKey)
+		} else if cfg.CloudFrontPrivateKeyPath != "" {
+			var err error
+			keyBytes, err = os.ReadFile(cfg.CloudFrontPrivateKeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("storage: failed to read CloudFront private key file: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("%w: CloudFrontPrivateKey or CloudFrontPrivateKeyPath is required when CloudFrontURL is set", ErrInvalidConfig)
+		}
+
+		privKey, err := parseRSAPrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("storage: failed to parse CloudFront private key: %w", err)
+		}
+
+		cfSigner = sign.NewURLSigner(cfg.CloudFrontKeyPairID, privKey)
+	}
+
 	return &S3{
 		client:               client,
 		presignClient:        presignClient,
@@ -145,6 +203,8 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 		defaultACL:           cfg.DefaultACL,
 		serverSideEncryption: cfg.ServerSideEncryption,
 		storageClass:         cfg.StorageClass,
+		cfURL:                cfURL,
+		cfSigner:             cfSigner,
 	}, nil
 }
 
@@ -553,6 +613,17 @@ func (s *S3) PresignedURL(ctx context.Context, path string, opts *PresignOptions
 		expires = 15 * time.Minute
 	}
 
+	// Use CloudFront signed URL if configured
+	if s.cfSigner != nil {
+		resourceURL := fmt.Sprintf("%s/%s", s.cfURL, key)
+		signedURL, err := s.cfSigner.Sign(resourceURL, time.Now().Add(expires))
+		if err != nil {
+			return "", fmt.Errorf("storage: failed to sign CloudFront URL: %w", err)
+		}
+		return signedURL, nil
+	}
+
+	// Fall back to S3 presigned URL
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -671,4 +742,31 @@ func (s *S3) translateError(err error) error {
 	}
 
 	return fmt.Errorf("storage: S3 error: %w", err)
+}
+
+// parseRSAPrivateKey parses a PEM-encoded RSA private key.
+func parseRSAPrivateKey(keyBytes []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(keyBytes)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block")
+	}
+
+	// Try PKCS#1 format first
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err == nil {
+		return key, nil
+	}
+
+	// Try PKCS#8 format
+	keyInterface, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	rsaKey, ok := keyInterface.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key is not RSA")
+	}
+
+	return rsaKey, nil
 }

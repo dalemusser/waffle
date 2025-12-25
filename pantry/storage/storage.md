@@ -236,6 +236,37 @@ store, err := storage.NewS3(ctx, storage.S3Config{
 })
 ```
 
+### AWS S3 with CloudFront
+
+For improved performance and caching, you can serve files through CloudFront with signed URLs:
+
+```go
+store, err := storage.NewS3(ctx, storage.S3Config{
+    Bucket: "my-bucket",
+    Region: "us-east-1",
+    Prefix: "uploads",
+
+    // CloudFront configuration
+    CloudFrontURL:            "https://d1234abcd.cloudfront.net",
+    CloudFrontKeyPairID:      "K1234ABCD",
+    CloudFrontPrivateKeyPath: "/path/to/cloudfront-private-key.pem",
+    // Or provide the key directly:
+    // CloudFrontPrivateKey: "-----BEGIN RSA PRIVATE KEY-----\n...",
+})
+
+// PresignedURL now returns CloudFront signed URLs instead of S3 presigned URLs
+url, err := store.PresignedURL(ctx, "documents/report.pdf", &storage.PresignOptions{
+    Expires: 1 * time.Hour,
+})
+// url: https://d1234abcd.cloudfront.net/uploads/documents/report.pdf?Expires=...&Signature=...&Key-Pair-Id=K1234ABCD
+```
+
+CloudFront signed URLs are useful when:
+- You need global edge caching for better download performance
+- You want to reduce S3 request costs (CloudFront caches responses)
+- You need custom domain names for file URLs
+- You want additional security features like geo-restrictions
+
 ### Google Cloud Storage
 
 ```go
