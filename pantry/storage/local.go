@@ -597,6 +597,12 @@ func (l *Local) URL(path string) string {
 	return l.baseURL + "/" + path
 }
 
+// GetFullPath returns the full filesystem path for an object.
+// This is useful for serving files directly via http.ServeFile.
+func (l *Local) GetFullPath(path string) (string, error) {
+	return l.fullPath(path)
+}
+
 // ComputeETag computes an ETag (MD5 hash) for file content.
 func ComputeETag(r io.Reader) (string, error) {
 	h := md5.New()
