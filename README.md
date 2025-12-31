@@ -1,5 +1,3 @@
-*Note:* WAFFLE is currently in development. This note will be taken down when WAFFLE is fully ready to use.
-
 ## 🧇 The WAFFLE Manifesto
 
 Web Application Framework for Flavorful Layered Engineering
