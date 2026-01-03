@@ -40,17 +40,25 @@ func (a AppConfigValues) String(key string) string {
 }
 
 // Int returns an int value or 0 if not found/wrong type.
+// Handles both int and int64 (TOML/Viper returns int64 for integers).
 func (a AppConfigValues) Int(key string) int {
-	if v, ok := a[key].(int); ok {
+	switch v := a[key].(type) {
+	case int:
 		return v
+	case int64:
+		return int(v)
 	}
 	return 0
 }
 
 // Int64 returns an int64 value or 0 if not found/wrong type.
+// Handles both int64 and int for flexibility.
 func (a AppConfigValues) Int64(key string) int64 {
-	if v, ok := a[key].(int64); ok {
+	switch v := a[key].(type) {
+	case int64:
 		return v
+	case int:
+		return int64(v)
 	}
 	return 0
 }
