@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -77,6 +78,26 @@ func (a AppConfigValues) StringSlice(key string) []string {
 		return v
 	}
 	return nil
+}
+
+// Duration parses a duration value from the config.
+// Accepts:
+//   - Duration strings: "10m", "1h30m", "90s", "2h"
+//   - Numeric values: interpreted as seconds (e.g., 600 = 10 minutes)
+//   - Plain numeric strings: "600" = 600 seconds
+//
+// Returns the default value if the key is not found, empty, or invalid.
+// Use this for timeout, expiry, and interval configurations.
+func (a AppConfigValues) Duration(key string, def time.Duration) time.Duration {
+	raw := a[key]
+	if raw == nil {
+		return def
+	}
+	dur, err := parseDurationFlexible(raw, def)
+	if err != nil {
+		return def
+	}
+	return dur
 }
 
 // loadAppConfig loads app-specific configuration using the same precedence
