@@ -38,12 +38,21 @@ type TLSConfig struct {
 	UseLetsEncrypt      bool   `mapstructure:"use_lets_encrypt"`
 	LetsEncryptEmail    string `mapstructure:"lets_encrypt_email"`
 	LetsEncryptCacheDir string `mapstructure:"lets_encrypt_cache_dir"`
-	Domain              string `mapstructure:"domain"`
+
+	// Domain is the single domain for TLS/ACME (backward compatible).
+	// Use Domains for multiple domains on a single certificate.
+	// Cannot specify both Domain and Domains.
+	Domain string `mapstructure:"domain"`
+
+	// Domains is a list of domains for a single certificate (e.g., ["example.com", "*.example.com"]).
+	// Use this for wildcard + apex domain certificates.
+	// Cannot specify both Domain and Domains.
+	Domains []string `mapstructure:"domains"`
 
 	// LetsEncryptChallenge selects which ACME challenge type to use when
 	// UseLetsEncrypt is true. Supported values:
 	//   - "http-01" (default; uses an HTTP challenge endpoint)
-	//   - "dns-01"  (for use with Route 53 DNS TXT records)
+	//   - "dns-01"  (for use with Route 53 DNS TXT records; required for wildcards)
 	LetsEncryptChallenge string `mapstructure:"lets_encrypt_challenge"`
 
 	// Route53HostedZoneID is required when using DNS-01 with Route 53 so the
@@ -55,6 +64,19 @@ type TLSConfig struct {
 	//   - Production: https://acme-v02.api.letsencrypt.org/directory
 	//   - Staging:    https://acme-staging-v02.api.letsencrypt.org/directory
 	ACMEDirectoryURL string `mapstructure:"acme_directory_url"`
+}
+
+// EffectiveDomains returns the list of domains for certificate generation.
+// It returns Domains if set, otherwise a single-element slice containing Domain.
+// Returns nil if neither is configured.
+func (t TLSConfig) EffectiveDomains() []string {
+	if len(t.Domains) > 0 {
+		return t.Domains
+	}
+	if strings.TrimSpace(t.Domain) != "" {
+		return []string{t.Domain}
+	}
+	return nil
 }
 
 // CORSConfig groups all CORS behavior and lists.
@@ -153,7 +175,8 @@ func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey
 	pflag.String("lets_encrypt_cache_dir", "letsencrypt-cache", "ACME cache dir")
 	pflag.String("cert_file", "", "TLS cert file (manual TLS)")
 	pflag.String("key_file", "", "TLS key file  (manual TLS)")
-	pflag.String("domain", "", "Domain for TLS or ACME")
+	pflag.String("domain", "", "Domain for TLS or ACME (single domain, backward compatible)")
+	pflag.String("domains", "", `JSON array of domains for multi-domain cert, e.g. '["example.com", "*.example.com"]'`)
 	pflag.String("lets_encrypt_challenge", "http-01", "ACME challenge type: http-01 or dns-01")
 	pflag.String("route53_hosted_zone_id", "", "Route53 hosted zone ID (for dns-01)")
 	pflag.String("acme_directory_url", "", "ACME directory URL (defaults to Let's Encrypt staging/prod based on env)")
@@ -243,6 +266,7 @@ func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey
 		"cors_allowed_methods",
 		"cors_allowed_headers",
 		"cors_exposed_headers",
+		"domains",
 	); err != nil {
 		return nil, nil, err
 	}
@@ -309,7 +333,7 @@ func allKeys() []string {
 		"http_port", "https_port", "use_https",
 		"read_timeout", "read_header_timeout", "write_timeout", "idle_timeout", "shutdown_timeout",
 		"use_lets_encrypt", "lets_encrypt_email", "lets_encrypt_cache_dir",
-		"cert_file", "key_file", "domain",
+		"cert_file", "key_file", "domain", "domains",
 		"lets_encrypt_challenge", "route53_hosted_zone_id", "acme_directory_url",
 		"db_connect_timeout", "index_boot_timeout",
 		"enable_compression", "compression_level",
@@ -341,6 +365,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("cert_file", "")
 	v.SetDefault("key_file", "")
 	v.SetDefault("domain", "")
+	v.SetDefault("domains", []string{})
 	v.SetDefault("lets_encrypt_challenge", "http-01")
 	v.SetDefault("route53_hosted_zone_id", "")
 	v.SetDefault("acme_directory_url", "") // Empty means auto-detect based on env
@@ -431,9 +456,16 @@ func validateCoreConfig(cfg CoreConfig) error {
 	}
 
 	if cfg.TLS.UseLetsEncrypt {
-		if strings.TrimSpace(cfg.TLS.Domain) == "" {
-			missing = append(missing, "WAFFLE_DOMAIN (or --domain) for Let's Encrypt")
+		// Check domain/domains configuration
+		hasSingleDomain := strings.TrimSpace(cfg.TLS.Domain) != ""
+		hasMultipleDomains := len(cfg.TLS.Domains) > 0
+
+		if hasSingleDomain && hasMultipleDomains {
+			invalid = append(invalid, "cannot specify both domain and domains; use one or the other")
+		} else if !hasSingleDomain && !hasMultipleDomains {
+			missing = append(missing, "WAFFLE_DOMAIN or WAFFLE_DOMAINS for Let's Encrypt")
 		}
+
 		if s := strings.TrimSpace(cfg.TLS.LetsEncryptEmail); s == "" {
 			missing = append(missing, "WAFFLE_LETS_ENCRYPT_EMAIL (or --lets_encrypt_email)")
 		} else if !isValidEmail(cfg.TLS.LetsEncryptEmail) {
@@ -446,6 +478,18 @@ func validateCoreConfig(cfg CoreConfig) error {
 		}
 		if chal == "dns-01" && strings.TrimSpace(cfg.TLS.Route53HostedZoneID) == "" {
 			missing = append(missing, "WAFFLE_ROUTE53_HOSTED_ZONE_ID (or --route53_hosted_zone_id) for dns-01")
+		}
+
+		// Check for wildcards - they require dns-01 challenge
+		allDomains := cfg.TLS.Domains
+		if hasSingleDomain {
+			allDomains = []string{cfg.TLS.Domain}
+		}
+		for _, d := range allDomains {
+			if strings.HasPrefix(d, "*.") && chal != "dns-01" {
+				invalid = append(invalid, fmt.Sprintf("wildcard domain %q requires dns-01 challenge (set lets_encrypt_challenge=dns-01)", d))
+				break
+			}
 		}
 
 		// Validate ACME directory URL format if explicitly provided.

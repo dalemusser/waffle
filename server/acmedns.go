@@ -32,7 +32,7 @@ import (
 
 // DNS01Manager manages ACME certificates using DNS-01 challenges via Route 53.
 type DNS01Manager struct {
-	Domain           string
+	Domains          []string // One or more domains for the certificate (e.g., ["example.com", "*.example.com"])
 	Email            string
 	CacheDir         string
 	HostedZoneID     string
@@ -67,6 +67,11 @@ type DNS01Manager struct {
 	// dnsMu serializes DNS record operations to prevent rate limit issues
 	// with Route 53 API and ensure consistent record state.
 	dnsMu sync.Mutex
+
+	// Background renewal
+	bgCtx       context.Context
+	bgCancel    context.CancelFunc
+	bgWg        sync.WaitGroup
 }
 
 // acmeAccount represents a cached ACME account.
@@ -75,13 +80,22 @@ type acmeAccount struct {
 }
 
 // NewDNS01Manager creates a new DNS-01 certificate manager.
+// domains is a list of domains for the certificate (e.g., ["example.com", "*.example.com"]).
 // acmeDirectoryURL specifies the ACME directory URL (e.g., Let's Encrypt production or staging).
-func NewDNS01Manager(domain, email, cacheDir, hostedZoneID, acmeDirectoryURL string, logger *zap.Logger) (*DNS01Manager, error) {
-	if domain == "" {
-		return nil, errors.New("dns01: domain is required")
+func NewDNS01Manager(domains []string, email, cacheDir, hostedZoneID, acmeDirectoryURL string, logger *zap.Logger) (*DNS01Manager, error) {
+	if len(domains) == 0 {
+		return nil, errors.New("dns01: at least one domain is required")
 	}
-	if err := validateDomainFormat(domain); err != nil {
-		return nil, fmt.Errorf("dns01: %w", err)
+	// Validate all domains and check for duplicates
+	seen := make(map[string]bool)
+	for _, domain := range domains {
+		if err := validateDomainFormat(domain); err != nil {
+			return nil, fmt.Errorf("dns01: invalid domain %q: %w", domain, err)
+		}
+		if seen[domain] {
+			return nil, fmt.Errorf("dns01: duplicate domain %q", domain)
+		}
+		seen[domain] = true
 	}
 	if email == "" {
 		return nil, errors.New("dns01: email is required")
@@ -116,7 +130,7 @@ func NewDNS01Manager(domain, email, cacheDir, hostedZoneID, acmeDirectoryURL str
 	}
 
 	m := &DNS01Manager{
-		Domain:           domain,
+		Domains:          domains,
 		Email:            email,
 		CacheDir:         cacheDir,
 		HostedZoneID:     hostedZoneID,
@@ -210,7 +224,7 @@ func (m *DNS01Manager) GetCertificate(hello *tls.ClientHelloInfo) (cert *tls.Cer
 		if r := recover(); r != nil {
 			m.Logger.Error("panic during certificate obtainment",
 				zap.Any("panic", r),
-				zap.String("domain", m.Domain))
+				zap.Strings("domains", m.Domains))
 			cert = nil
 			err = fmt.Errorf("internal error obtaining certificate: %v", r)
 		}
@@ -241,7 +255,7 @@ func (m *DNS01Manager) GetCertificate(hello *tls.ClientHelloInfo) (cert *tls.Cer
 	// Log timeout errors explicitly for easier debugging
 	if errors.Is(err, context.DeadlineExceeded) {
 		m.Logger.Error("certificate obtainment timed out",
-			zap.String("domain", m.Domain),
+			zap.Strings("domains", m.Domains),
 			zap.Duration("timeout", 10*time.Minute),
 			zap.Error(err))
 	}
@@ -264,25 +278,25 @@ func (m *DNS01Manager) doObtainCertificate(ctx context.Context) (*tls.Certificat
 			m.certExpiry = expiry
 			m.certMu.Unlock()
 			m.Logger.Info("loaded certificate from cache",
-				zap.String("domain", m.Domain),
+				zap.Strings("domains", m.Domains),
 				zap.Time("expiry", expiry))
 			return cert, nil
 		}
 		m.Logger.Info("cached certificate needs renewal",
-			zap.String("domain", m.Domain),
+			zap.Strings("domains", m.Domains),
 			zap.Time("expiry", expiry))
 	}
 
 	m.Logger.Info("obtaining new certificate via DNS-01",
-		zap.String("domain", m.Domain))
+		zap.Strings("domains", m.Domains))
 
 	// Initialize ACME client if needed
 	if err := m.ensureClient(ctx); err != nil {
 		return nil, fmt.Errorf("dns01: init client: %w", err)
 	}
 
-	// Create new order
-	order, err := m.client.AuthorizeOrder(ctx, acme.DomainIDs(m.Domain))
+	// Create new order for all domains
+	order, err := m.client.AuthorizeOrder(ctx, acme.DomainIDs(m.Domains...))
 	if err != nil {
 		return nil, fmt.Errorf("dns01: authorize order: %w", err)
 	}
@@ -332,7 +346,9 @@ func (m *DNS01Manager) doObtainCertificate(ctx context.Context) (*tls.Certificat
 		// Create DNS TXT record
 		// For wildcard domains (*.example.com), the challenge record goes on
 		// _acme-challenge.example.com (without the wildcard prefix).
-		challengeDomain := m.Domain
+		// Get the domain from the authorization identifier, not the config,
+		// since we may have multiple domains in the order.
+		challengeDomain := authz.Identifier.Value
 		if strings.HasPrefix(challengeDomain, "*.") {
 			challengeDomain = challengeDomain[2:]
 		}
@@ -393,9 +409,9 @@ func (m *DNS01Manager) doObtainCertificate(ctx context.Context) (*tls.Certificat
 		return nil, fmt.Errorf("dns01: generate cert key: %w", err)
 	}
 
-	// Create CSR
+	// Create CSR with all domains
 	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
-		DNSNames: []string{m.Domain},
+		DNSNames: m.Domains,
 	}, certKey)
 	if err != nil {
 		return nil, fmt.Errorf("dns01: create CSR: %w", err)
@@ -441,7 +457,7 @@ func (m *DNS01Manager) doObtainCertificate(ctx context.Context) (*tls.Certificat
 	m.certMu.Unlock()
 
 	m.Logger.Info("obtained new certificate",
-		zap.String("domain", m.Domain),
+		zap.Strings("domains", m.Domains),
 		zap.Time("expiry", leaf.NotAfter))
 
 	return cert, nil
@@ -692,13 +708,26 @@ func (m *DNS01Manager) safeCachePath(filename string) (string, error) {
 	return fullPath, nil
 }
 
+// cachePrefix returns a filesystem-safe prefix for cache files.
+// Uses the primary (first) domain with wildcard asterisk replaced.
+func (m *DNS01Manager) cachePrefix() string {
+	if len(m.Domains) == 0 {
+		return "cert"
+	}
+	// Use first domain as cache key, replacing wildcard for filesystem safety
+	name := m.Domains[0]
+	name = strings.Replace(name, "*.", "wildcard.", 1)
+	return name
+}
+
 // loadCachedCert loads a cached certificate.
 func (m *DNS01Manager) loadCachedCert() (*tls.Certificate, time.Time, error) {
-	certPath, err := m.safeCachePath(m.Domain + ".crt")
+	prefix := m.cachePrefix()
+	certPath, err := m.safeCachePath(prefix + ".crt")
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("cert path: %w", err)
 	}
-	keyPath, err := m.safeCachePath(m.Domain + ".key")
+	keyPath, err := m.safeCachePath(prefix + ".key")
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("key path: %w", err)
 	}
@@ -729,21 +758,29 @@ func (m *DNS01Manager) loadCachedCert() (*tls.Certificate, time.Time, error) {
 		return nil, time.Time{}, errors.New("no leaf certificate in chain")
 	}
 
-	// Validate that the cached certificate is for the expected domain.
+	// Validate that the cached certificate covers all expected domains.
 	// This is defense-in-depth against cache corruption or tampering.
-	if !m.certMatchesDomain(cert.Leaf) {
-		return nil, time.Time{}, fmt.Errorf("cached certificate is for wrong domain (expected %s, got %v)",
-			m.Domain, cert.Leaf.DNSNames)
+	if !m.certMatchesDomains(cert.Leaf) {
+		return nil, time.Time{}, fmt.Errorf("cached certificate doesn't cover all domains (expected %v, got %v)",
+			m.Domains, cert.Leaf.DNSNames)
 	}
 
 	return &cert, cert.Leaf.NotAfter, nil
 }
 
-// certMatchesDomain checks if a certificate is valid for the manager's domain.
+// certMatchesDomains checks if a certificate covers all configured domains.
+func (m *DNS01Manager) certMatchesDomains(leaf *x509.Certificate) bool {
+	for _, expectedDomain := range m.Domains {
+		if !m.domainCoveredByCert(leaf, expectedDomain) {
+			return false
+		}
+	}
+	return true
+}
+
+// domainCoveredByCert checks if a single domain is covered by the certificate.
 // It handles both exact matches and wildcard certificates.
-func (m *DNS01Manager) certMatchesDomain(leaf *x509.Certificate) bool {
-	// For wildcard domains like "*.example.com", check if cert covers it
-	expectedDomain := m.Domain
+func (m *DNS01Manager) domainCoveredByCert(leaf *x509.Certificate, expectedDomain string) bool {
 	expectedBase := strings.TrimPrefix(expectedDomain, "*.")
 
 	for _, dnsName := range leaf.DNSNames {
@@ -774,11 +811,12 @@ func (m *DNS01Manager) certMatchesDomain(leaf *x509.Certificate) bool {
 // is serialized by renewMu in GetCertificate. Therefore, concurrent cache
 // writes are not possible within a single DNS01Manager instance.
 func (m *DNS01Manager) cacheCert(cert *tls.Certificate) error {
-	certPath, err := m.safeCachePath(m.Domain + ".crt")
+	prefix := m.cachePrefix()
+	certPath, err := m.safeCachePath(prefix + ".crt")
 	if err != nil {
 		return fmt.Errorf("cert path: %w", err)
 	}
-	keyPath, err := m.safeCachePath(m.Domain + ".key")
+	keyPath, err := m.safeCachePath(prefix + ".key")
 	if err != nil {
 		return fmt.Errorf("key path: %w", err)
 	}
@@ -1159,4 +1197,95 @@ func (m *DNS01Manager) PreWarm(ctx context.Context) error {
 	}
 	_, err := m.doObtainCertificate(ctx)
 	return err
+}
+
+// Background renewal constants
+const (
+	// renewalCheckInterval is how often to check if renewal is needed.
+	renewalCheckInterval = 12 * time.Hour
+)
+
+// StartBackgroundRenewal starts a goroutine that proactively renews certificates
+// before they expire. This prevents renewal latency during user TLS handshakes.
+// Call StopBackgroundRenewal to stop the background goroutine gracefully.
+func (m *DNS01Manager) StartBackgroundRenewal() {
+	m.bgCtx, m.bgCancel = context.WithCancel(context.Background())
+	m.bgWg.Add(1)
+
+	go func() {
+		defer m.bgWg.Done()
+
+		ticker := time.NewTicker(renewalCheckInterval)
+		defer ticker.Stop()
+
+		m.Logger.Info("started background certificate renewal",
+			zap.Duration("check_interval", renewalCheckInterval),
+			zap.Duration("renewal_buffer", renewalBuffer),
+			zap.Strings("domains", m.Domains))
+
+		for {
+			select {
+			case <-m.bgCtx.Done():
+				m.Logger.Info("stopping background certificate renewal")
+				return
+			case <-ticker.C:
+				m.checkAndRenewIfNeeded()
+			}
+		}
+	}()
+}
+
+// StopBackgroundRenewal stops the background renewal goroutine and waits for it to exit.
+func (m *DNS01Manager) StopBackgroundRenewal() {
+	if m.bgCancel != nil {
+		m.bgCancel()
+		m.bgWg.Wait()
+	}
+}
+
+// checkAndRenewIfNeeded checks if the certificate needs renewal and renews if necessary.
+func (m *DNS01Manager) checkAndRenewIfNeeded() {
+	m.certMu.RLock()
+	expiry := m.certExpiry
+	m.certMu.RUnlock()
+
+	timeUntilExpiry := time.Until(expiry)
+	needsRenewal := time.Now().Add(renewalBuffer).After(expiry)
+
+	if !needsRenewal {
+		m.Logger.Debug("certificate still valid, no renewal needed",
+			zap.Time("expiry", expiry),
+			zap.Duration("time_remaining", timeUntilExpiry),
+			zap.Strings("domains", m.Domains))
+		return
+	}
+
+	m.Logger.Info("proactively renewing certificate",
+		zap.Time("expiry", expiry),
+		zap.Duration("time_remaining", timeUntilExpiry),
+		zap.Strings("domains", m.Domains))
+
+	// Use a reasonable timeout for renewal (10 minutes)
+	renewCtx, cancel := context.WithTimeout(m.bgCtx, 10*time.Minute)
+	defer cancel()
+
+	// Use GetCertificate which handles synchronization
+	if _, err := m.GetCertificate(nil); err != nil {
+		// Check if we were cancelled
+		if m.bgCtx.Err() != nil {
+			m.Logger.Info("background renewal cancelled during shutdown")
+			return
+		}
+		m.Logger.Error("background certificate renewal failed",
+			zap.Error(err),
+			zap.Strings("domains", m.Domains))
+	} else {
+		m.certMu.RLock()
+		newExpiry := m.certExpiry
+		m.certMu.RUnlock()
+		m.Logger.Info("background certificate renewal succeeded",
+			zap.Strings("domains", m.Domains),
+			zap.Time("new_expiry", newExpiry))
+	}
+	_ = renewCtx // suppress unused warning
 }

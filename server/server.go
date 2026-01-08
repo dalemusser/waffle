@@ -134,8 +134,9 @@ func ListenAndServeWithContext(
 
 		if challenge == "dns-01" {
 			// DNS-01 challenge via Route 53
+			domains := cfg.TLS.EffectiveDomains()
 			dns01, err := NewDNS01Manager(
-				cfg.TLS.Domain,
+				domains,
 				cfg.TLS.LetsEncryptEmail,
 				cfg.TLS.LetsEncryptCacheDir,
 				cfg.TLS.Route53HostedZoneID,
@@ -148,10 +149,14 @@ func ListenAndServeWithContext(
 
 			// Pre-warm certificate before accepting connections
 			logger.Info("obtaining certificate via DNS-01 challenge",
-				zap.String("domain", cfg.TLS.Domain))
+				zap.Strings("domains", domains))
 			if err := dns01.PreWarm(ctx); err != nil {
 				return fmt.Errorf("dns-01 pre-warm: %w", err)
 			}
+
+			// Start background renewal to proactively renew before expiry
+			dns01.StartBackgroundRenewal()
+			defer dns01.StopBackgroundRenewal()
 
 			tlsCfg = &tls.Config{
 				MinVersion:     tls.VersionTLS12,
