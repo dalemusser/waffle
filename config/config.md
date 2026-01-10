@@ -10,7 +10,7 @@ The `config` package handles WAFFLE's core configuration — the settings shared
 defaults → config file → environment variables → command-line flags
 ```
 
-Application-specific configuration (database URIs, API keys, etc.) is handled separately in your app's `LoadConfig` hook, typically by reading additional environment variables or config sections.
+Application-specific configuration (database URIs, API keys, etc.) can be loaded alongside core config using `LoadWithAppConfig`, which provides a unified environment variable prefix for both core and app settings.
 
 ## Import
 
@@ -25,10 +25,10 @@ import "github.com/dalemusser/waffle/config"
 | Defaults | Lowest | Built into WAFFLE |
 | Config file | Low | `config.yaml`, `config.toml`, `config.json` |
 | `.env` file | Medium | Loaded via godotenv |
-| Environment | High | `WAFFLE_HTTP_PORT=8080` |
+| Environment | High | `MYAPP_HTTP_PORT=8080` |
 | Flags | Highest | `--http_port=8080` |
 
-Environment variables are prefixed with `WAFFLE_` and use underscores (e.g., `WAFFLE_USE_HTTPS=true`).
+Environment variables use a prefix that you specify when calling `LoadWithAppConfig`. For example, if your app uses prefix `"STRATA"`, then `STRATA_HTTP_PORT`, `STRATA_LOG_LEVEL`, etc. If no prefix is provided (or using `Load()`), the default `WAFFLE_` prefix is used for backward compatibility.
 
 ## API
 
@@ -45,20 +45,63 @@ Loads and validates the core configuration from all sources. Returns an error if
 **Example:**
 
 ```go
-func loadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
+func loadConfig(logger *zap.Logger) (*config.CoreConfig, error) {
     coreCfg, err := config.Load(logger)
+    if err != nil {
+        return nil, err
+    }
+    return coreCfg, nil
+}
+```
+
+### LoadWithAppConfig
+
+**Location:** `config.go`
+
+```go
+func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey) (*CoreConfig, AppConfigValues, error)
+```
+
+Loads both core config and app-specific config with a unified environment variable prefix. The `appEnvPrefix` is used for **all** environment variables (both core and app), allowing apps to have a single, consistent prefix.
+
+**Parameters:**
+- `logger`: Zap logger for logging config loading messages
+- `appEnvPrefix`: Environment variable prefix for all config (e.g., `"STRATA"` → `STRATA_HTTP_PORT`, `STRATA_MONGO_URI`)
+- `appKeys`: Slice of `AppKey` defining app-specific configuration keys
+
+If `appEnvPrefix` is empty, core config uses the default `"WAFFLE"` prefix for backward compatibility.
+
+**Example:**
+
+```go
+// Define app-specific config keys
+var appConfigKeys = []config.AppKey{
+    {Name: "mongo_uri", Default: "mongodb://localhost:27017", Desc: "MongoDB connection URI"},
+    {Name: "mongo_database", Default: "myapp", Desc: "MongoDB database name"},
+    {Name: "session_key", Default: "", Desc: "Session signing key"},
+}
+
+func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
+    // Use "STRATA" prefix for ALL env vars (core + app)
+    coreCfg, appValues, err := config.LoadWithAppConfig(logger, "STRATA", appConfigKeys)
     if err != nil {
         return nil, AppConfig{}, err
     }
 
-    // Load app-specific config from environment
     appCfg := AppConfig{
-        MongoURI: os.Getenv("MONGO_URI"),
-        MongoDB:  os.Getenv("MONGO_DB"),
+        MongoURI:      appValues.String("mongo_uri"),
+        MongoDatabase: appValues.String("mongo_database"),
+        SessionKey:    appValues.String("session_key"),
     }
 
     return coreCfg, appCfg, nil
 }
+
+// Now these environment variables all work:
+// STRATA_HTTP_PORT=8080       (core config)
+// STRATA_LOG_LEVEL=info       (core config)
+// STRATA_MONGO_URI=mongodb://... (app config)
+// STRATA_SESSION_KEY=secret   (app config)
 ```
 
 ### CoreConfig
@@ -143,56 +186,95 @@ func (c CoreConfig) Dump() string
 
 Returns a pretty-printed JSON representation of the config for debugging. Sensitive fields are redacted.
 
+### AppKey
+
+**Location:** `appconfig.go`
+
+```go
+type AppKey struct {
+    Name    string // Key name (e.g., "mongo_uri")
+    Default any    // Default value (string, int, int64, bool, []string)
+    Desc    string // Description for --help output
+}
+```
+
+Defines an application-specific configuration key. Used with `LoadWithAppConfig`.
+
+### AppConfigValues
+
+**Location:** `appconfig.go`
+
+```go
+type AppConfigValues map[string]any
+```
+
+Holds loaded app configuration values. Provides typed accessor methods:
+
+```go
+appCfg.String("mongo_uri")              // Returns string or ""
+appCfg.Int("port")                      // Returns int or 0
+appCfg.Int64("max_size")                // Returns int64 or 0
+appCfg.Bool("debug")                    // Returns bool or false
+appCfg.StringSlice("allowed_hosts")     // Returns []string or nil
+appCfg.Duration("timeout", 30*time.Second) // Returns duration or default
+```
+
 ## Configuration Reference
+
+Environment variable names use your app's prefix. For example, with prefix `"STRATA"`:
+- `env` → `STRATA_ENV`
+- `http_port` → `STRATA_HTTP_PORT`
+
+If using `Load()` without an app prefix, the default `WAFFLE_` prefix is used.
 
 ### Runtime
 
-| Key | Env Var | Default | Description |
-|-----|---------|---------|-------------|
-| `env` | `WAFFLE_ENV` | `"dev"` | Runtime environment |
-| `log_level` | `WAFFLE_LOG_LEVEL` | `"debug"` | Log level |
+| Key | Env Var Pattern | Default | Description |
+|-----|-----------------|---------|-------------|
+| `env` | `{PREFIX}_ENV` | `"dev"` | Runtime environment |
+| `log_level` | `{PREFIX}_LOG_LEVEL` | `"debug"` | Log level |
 
 ### HTTP
 
-| Key | Env Var | Default | Description |
-|-----|---------|---------|-------------|
-| `http_port` | `WAFFLE_HTTP_PORT` | `8080` | HTTP port |
-| `https_port` | `WAFFLE_HTTPS_PORT` | `443` | HTTPS port |
-| `use_https` | `WAFFLE_USE_HTTPS` | `false` | Enable HTTPS |
-| `max_request_body_bytes` | `WAFFLE_MAX_REQUEST_BODY_BYTES` | `2097152` (2MB) | Max request body size |
-| `enable_compression` | `WAFFLE_ENABLE_COMPRESSION` | `true` | Enable gzip compression |
+| Key | Env Var Pattern | Default | Description |
+|-----|-----------------|---------|-------------|
+| `http_port` | `{PREFIX}_HTTP_PORT` | `8080` | HTTP port |
+| `https_port` | `{PREFIX}_HTTPS_PORT` | `443` | HTTPS port |
+| `use_https` | `{PREFIX}_USE_HTTPS` | `false` | Enable HTTPS |
+| `max_request_body_bytes` | `{PREFIX}_MAX_REQUEST_BODY_BYTES` | `2097152` (2MB) | Max request body size |
+| `enable_compression` | `{PREFIX}_ENABLE_COMPRESSION` | `true` | Enable gzip compression |
 
 ### TLS / Let's Encrypt
 
-| Key | Env Var | Default | Description |
-|-----|---------|---------|-------------|
-| `cert_file` | `WAFFLE_CERT_FILE` | `""` | TLS certificate file (manual) |
-| `key_file` | `WAFFLE_KEY_FILE` | `""` | TLS key file (manual) |
-| `use_lets_encrypt` | `WAFFLE_USE_LETS_ENCRYPT` | `false` | Use ACME/Let's Encrypt |
-| `lets_encrypt_email` | `WAFFLE_LETS_ENCRYPT_EMAIL` | `""` | ACME account email |
-| `lets_encrypt_cache_dir` | `WAFFLE_LETS_ENCRYPT_CACHE_DIR` | `"letsencrypt-cache"` | ACME cache directory |
-| `domain` | `WAFFLE_DOMAIN` | `""` | Domain for TLS |
-| `lets_encrypt_challenge` | `WAFFLE_LETS_ENCRYPT_CHALLENGE` | `"http-01"` | ACME challenge type |
-| `route53_hosted_zone_id` | `WAFFLE_ROUTE53_HOSTED_ZONE_ID` | `""` | Route 53 zone (for dns-01) |
+| Key | Env Var Pattern | Default | Description |
+|-----|-----------------|---------|-------------|
+| `cert_file` | `{PREFIX}_CERT_FILE` | `""` | TLS certificate file (manual) |
+| `key_file` | `{PREFIX}_KEY_FILE` | `""` | TLS key file (manual) |
+| `use_lets_encrypt` | `{PREFIX}_USE_LETS_ENCRYPT` | `false` | Use ACME/Let's Encrypt |
+| `lets_encrypt_email` | `{PREFIX}_LETS_ENCRYPT_EMAIL` | `""` | ACME account email |
+| `lets_encrypt_cache_dir` | `{PREFIX}_LETS_ENCRYPT_CACHE_DIR` | `"letsencrypt-cache"` | ACME cache directory |
+| `domain` | `{PREFIX}_DOMAIN` | `""` | Domain for TLS |
+| `lets_encrypt_challenge` | `{PREFIX}_LETS_ENCRYPT_CHALLENGE` | `"http-01"` | ACME challenge type |
+| `route53_hosted_zone_id` | `{PREFIX}_ROUTE53_HOSTED_ZONE_ID` | `""` | Route 53 zone (for dns-01) |
 
 ### CORS
 
-| Key | Env Var | Default | Description |
-|-----|---------|---------|-------------|
-| `enable_cors` | `WAFFLE_ENABLE_CORS` | `false` | Enable CORS middleware |
-| `cors_allowed_origins` | `WAFFLE_CORS_ALLOWED_ORIGINS` | `[]` | JSON array of origins |
-| `cors_allowed_methods` | `WAFFLE_CORS_ALLOWED_METHODS` | `[]` | JSON array of methods |
-| `cors_allowed_headers` | `WAFFLE_CORS_ALLOWED_HEADERS` | `[]` | JSON array of headers |
-| `cors_exposed_headers` | `WAFFLE_CORS_EXPOSED_HEADERS` | `[]` | JSON array of exposed headers |
-| `cors_allow_credentials` | `WAFFLE_CORS_ALLOW_CREDENTIALS` | `false` | Allow credentials |
-| `cors_max_age` | `WAFFLE_CORS_MAX_AGE` | `0` | Preflight cache seconds |
+| Key | Env Var Pattern | Default | Description |
+|-----|-----------------|---------|-------------|
+| `enable_cors` | `{PREFIX}_ENABLE_CORS` | `false` | Enable CORS middleware |
+| `cors_allowed_origins` | `{PREFIX}_CORS_ALLOWED_ORIGINS` | `[]` | JSON array of origins |
+| `cors_allowed_methods` | `{PREFIX}_CORS_ALLOWED_METHODS` | `[]` | JSON array of methods |
+| `cors_allowed_headers` | `{PREFIX}_CORS_ALLOWED_HEADERS` | `[]` | JSON array of headers |
+| `cors_exposed_headers` | `{PREFIX}_CORS_EXPOSED_HEADERS` | `[]` | JSON array of exposed headers |
+| `cors_allow_credentials` | `{PREFIX}_CORS_ALLOW_CREDENTIALS` | `false` | Allow credentials |
+| `cors_max_age` | `{PREFIX}_CORS_MAX_AGE` | `0` | Preflight cache seconds |
 
 ### Timeouts
 
-| Key | Env Var | Default | Description |
-|-----|---------|---------|-------------|
-| `db_connect_timeout` | `WAFFLE_DB_CONNECT_TIMEOUT` | `"10s"` | DB connection timeout |
-| `index_boot_timeout` | `WAFFLE_INDEX_BOOT_TIMEOUT` | `"120s"` | Schema/index creation timeout |
+| Key | Env Var Pattern | Default | Description |
+|-----|-----------------|---------|-------------|
+| `db_connect_timeout` | `{PREFIX}_DB_CONNECT_TIMEOUT` | `"10s"` | DB connection timeout |
+| `index_boot_timeout` | `{PREFIX}_INDEX_BOOT_TIMEOUT` | `"120s"` | Schema/index creation timeout |
 
 ## Config File Examples
 
@@ -240,16 +322,25 @@ domain = "example.com"
 
 ### Environment Variables
 
+With a unified prefix (e.g., `"STRATA"`), all env vars use the same prefix:
+
 ```bash
-# .env or shell environment
-WAFFLE_ENV=prod
-WAFFLE_LOG_LEVEL=info
-WAFFLE_USE_HTTPS=true
-WAFFLE_USE_LETS_ENCRYPT=true
-WAFFLE_LETS_ENCRYPT_EMAIL=admin@example.com
-WAFFLE_DOMAIN=example.com
-WAFFLE_CORS_ALLOWED_ORIGINS='["https://app.example.com"]'
+# .env or shell environment (using STRATA prefix)
+STRATA_ENV=prod
+STRATA_LOG_LEVEL=info
+STRATA_HTTP_PORT=8080
+STRATA_USE_HTTPS=true
+STRATA_USE_LETS_ENCRYPT=true
+STRATA_LETS_ENCRYPT_EMAIL=admin@example.com
+STRATA_DOMAIN=example.com
+STRATA_CORS_ALLOWED_ORIGINS='["https://app.example.com"]'
+
+# App-specific config also uses the same prefix
+STRATA_MONGO_URI=mongodb://localhost:27017
+STRATA_SESSION_KEY=your-secret-key
 ```
+
+If using `Load()` without an app prefix, use `WAFFLE_` prefix for backward compatibility.
 
 ## Validation
 

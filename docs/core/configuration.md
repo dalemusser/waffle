@@ -31,11 +31,13 @@ Everything here applies to all WAFFLE applications.
 ```mermaid
 flowchart LR
     A["config.toml / config.yaml / config.json"] --> D["Viper Loader"]
-    B["Environment Variables (WAFFLE_*)"] --> D
+    B["Environment Variables ({PREFIX}_*)"] --> D
     C["Command-Line Flags"] --> D
     D --> E["CoreConfig"]
     D --> F["AppConfig"]
 ```
+
+The `{PREFIX}` is your app's prefix (e.g., `STRATA`, `STRATAHUB`), specified when calling `LoadWithAppConfig`.
 
 See also the full version in  
 [Configuration Flow](./architecture.md#-configuration-flow).
@@ -52,16 +54,19 @@ WAFFLE supports (via Viper):
 
 Files are loaded automatically if present in the working directory.
 
-### ✔ 2. **Environment variables**  
-Environment variables always use the **`WAFFLE_` prefix**.
+### ✔ 2. **Environment variables**
+Environment variables use a prefix that you specify when calling `LoadWithAppConfig`. This allows your app to have a unified, consistent prefix for all configuration.
 
-Examples:
+For example, with prefix `"STRATA"`:
 
 ```
-WAFFLE_ENV=production
-WAFFLE_GREETING="Hello WAFFLE"
-WAFFLE_PORT=8080
+STRATA_ENV=production
+STRATA_HTTP_PORT=8080
+STRATA_MONGO_URI=mongodb://localhost:27017
+STRATA_SESSION_KEY=your-secret
 ```
+
+If using `Load()` without an app prefix, the default `WAFFLE_` prefix is used for backward compatibility.
 
 ### ✔ 3. **Command-line flags**  
 If the developer chooses to add flag overrides, WAFFLE will always place CLI flags at the highest precedence.
@@ -106,37 +111,33 @@ type AppConfig struct {
 
 Values for these fields come from:
 
-- config file keys  
-- environment variables  
+- config file keys
+- environment variables
 - CLI flags (if added)
 
-Example mappings:
+Example mappings (with prefix `"MYAPP"`):
 
 ```
 config.toml → greeting = "Hello"
-env var     → WAFFLE_GREETING=Hello
+env var     → MYAPP_GREETING=Hello
 ```
 
 ---
 
-# 🏷 3. Environment Variable Prefix (`WAFFLE_`)
+# 🏷 3. Environment Variable Prefix
 
-WAFFLE uses the prefix:
+WAFFLE uses a **configurable prefix** for environment variables. When calling `LoadWithAppConfig`, you specify your app's prefix, and it applies to **all** configuration — both core (HTTP, TLS, logging) and app-specific (database, sessions, etc.).
 
-```
-WAFFLE_
-```
+For example, with prefix `"STRATA"`:
 
-to prevent naming collisions with other software.
+- `STRATA_HTTP_PORT=8080` (core config)
+- `STRATA_LOG_LEVEL=info` (core config)
+- `STRATA_MONGO_URI=mongodb://...` (app config)
+- `STRATA_SESSION_KEY=secret` (app config)
 
-Examples:
+This unified approach means you only need to remember one prefix for your entire application.
 
-- `WAFFLE_PORT=8080`  
-- `WAFFLE_GREETING="Hi"`  
-- `WAFFLE_ENV=production`  
-
-Later, WAFFLE may expose a configurable prefix for app-level fields.  
-For now, the prefix is consistent and predictable — an advantage for clarity and teaching.
+**Backward compatibility:** If you use `Load()` without an app prefix, or pass an empty prefix to `LoadWithAppConfig`, the default `WAFFLE_` prefix is used for core config.
 
 ---
 
@@ -229,13 +230,13 @@ http_port = 8080
 greeting = "Hello from TOML"
 ```
 
-Equivalent environment variables:
+Equivalent environment variables (with prefix `"MYAPP"`):
 
 ```
-WAFFLE_ENV=development
-WAFFLE_LOG_LEVEL=debug
-WAFFLE_HTTP_PORT=8080
-WAFFLE_GREETING="Hello from TOML"
+MYAPP_ENV=development
+MYAPP_LOG_LEVEL=debug
+MYAPP_HTTP_PORT=8080
+MYAPP_GREETING="Hello from TOML"
 ```
 
 ## **YAML**
