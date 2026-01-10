@@ -141,9 +141,14 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 // It merges defaults → config.* file(s) → env vars → explicit flags.
 // Final precedence (highest wins): flags(explicit) > env > config > defaults.
 //
-// The appEnvPrefix is used for app config environment variables. For example,
-// if appEnvPrefix is "STRATAHUB" and an AppKey has Name "session_name", the
-// environment variable would be "STRATAHUB_SESSION_NAME".
+// The appEnvPrefix is used for BOTH core and app environment variables.
+// This allows apps to have a unified prefix for all configuration.
+// For example, if appEnvPrefix is "STRATA":
+//   - Core config: STRATA_HTTP_PORT, STRATA_LOG_LEVEL, etc.
+//   - App config: STRATA_MONGO_URI, STRATA_SESSION_NAME, etc.
+//
+// If appEnvPrefix is empty, core config uses "WAFFLE" prefix for backward
+// compatibility with existing deployments.
 //
 // Config file keys and CLI flags use the key name directly (e.g., "session_name").
 //
@@ -155,6 +160,7 @@ func Load(logger *zap.Logger) (*CoreConfig, error) {
 //	}
 //	coreCfg, appCfg, err := config.LoadWithAppConfig(logger, "MYAPP", appKeys)
 //	mongoURI := appCfg.String("mongo_uri")
+//	// Environment variables: MYAPP_HTTP_PORT, MYAPP_MONGO_URI, etc.
 func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey) (*CoreConfig, AppConfigValues, error) {
 	// 0) Optionally load .env (safe: real env still wins over .env)
 	if err := godotenv.Load(); err == nil && logger != nil {
@@ -216,7 +222,13 @@ func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey
 
 	// 2) Viper + env
 	v := viper.New()
-	v.SetEnvPrefix("WAFFLE")
+	// Use appEnvPrefix for both core and app config if provided,
+	// otherwise fall back to "WAFFLE" for backward compatibility.
+	envPrefix := "WAFFLE"
+	if appEnvPrefix != "" {
+		envPrefix = appEnvPrefix
+	}
+	v.SetEnvPrefix(envPrefix)
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	v.AutomaticEnv()
 
@@ -317,7 +329,7 @@ func LoadWithAppConfig(logger *zap.Logger, appEnvPrefix string, appKeys []AppKey
 	cfg.TLS.LetsEncryptChallenge = strings.ToLower(strings.TrimSpace(cfg.TLS.LetsEncryptChallenge))
 
 	// 9) Validate core config
-	if err := validateCoreConfig(cfg); err != nil {
+	if err := validateCoreConfig(cfg, envPrefix); err != nil {
 		return nil, nil, err
 	}
 
@@ -435,7 +447,7 @@ func normalizeListKeys(logger *zap.Logger, v *viper.Viper, keys ...string) error
 	return nil
 }
 
-func validateCoreConfig(cfg CoreConfig) error {
+func validateCoreConfig(cfg CoreConfig, envPrefix string) error {
 	var missing []string
 	var invalid []string
 
@@ -463,11 +475,11 @@ func validateCoreConfig(cfg CoreConfig) error {
 		if hasSingleDomain && hasMultipleDomains {
 			invalid = append(invalid, "cannot specify both domain and domains; use one or the other")
 		} else if !hasSingleDomain && !hasMultipleDomains {
-			missing = append(missing, "WAFFLE_DOMAIN or WAFFLE_DOMAINS for Let's Encrypt")
+			missing = append(missing, fmt.Sprintf("%s_DOMAIN or %s_DOMAINS for Let's Encrypt", envPrefix, envPrefix))
 		}
 
 		if s := strings.TrimSpace(cfg.TLS.LetsEncryptEmail); s == "" {
-			missing = append(missing, "WAFFLE_LETS_ENCRYPT_EMAIL (or --lets_encrypt_email)")
+			missing = append(missing, fmt.Sprintf("%s_LETS_ENCRYPT_EMAIL (or --lets_encrypt_email)", envPrefix))
 		} else if !isValidEmail(cfg.TLS.LetsEncryptEmail) {
 			invalid = append(invalid, "lets_encrypt_email must be a valid email address (e.g., user@example.com)")
 		}
@@ -477,7 +489,7 @@ func validateCoreConfig(cfg CoreConfig) error {
 			invalid = append(invalid, "lets_encrypt_challenge must be \"http-01\" or \"dns-01\"")
 		}
 		if chal == "dns-01" && strings.TrimSpace(cfg.TLS.Route53HostedZoneID) == "" {
-			missing = append(missing, "WAFFLE_ROUTE53_HOSTED_ZONE_ID (or --route53_hosted_zone_id) for dns-01")
+			missing = append(missing, fmt.Sprintf("%s_ROUTE53_HOSTED_ZONE_ID (or --route53_hosted_zone_id) for dns-01", envPrefix))
 		}
 
 		// Check for wildcards - they require dns-01 challenge
@@ -511,7 +523,7 @@ func validateCoreConfig(cfg CoreConfig) error {
 	// Manual TLS requirements
 	if cfg.HTTP.UseHTTPS && !cfg.TLS.UseLetsEncrypt {
 		if strings.TrimSpace(cfg.TLS.CertFile) == "" || strings.TrimSpace(cfg.TLS.KeyFile) == "" {
-			missing = append(missing, "WAFFLE_CERT_FILE and WAFFLE_KEY_FILE (or --cert_file/--key_file) for manual TLS")
+			missing = append(missing, fmt.Sprintf("%s_CERT_FILE and %s_KEY_FILE (or --cert_file/--key_file) for manual TLS", envPrefix, envPrefix))
 		}
 	}
 
