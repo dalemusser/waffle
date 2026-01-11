@@ -1,6 +1,10 @@
 // auth/oauth2/clever.go
 package oauth2
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"context"
 	"encoding/json"
