@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// DefaultExcludedPaths contains paths that should typically not be used as
+// return URLs after login. These prevent redirect loops and immediate logout
+// scenarios where a user logs in and is immediately redirected to logout.
+var DefaultExcludedPaths = []string{"/logout", "/login"}
+
 // SafeReturn validates and sanitizes a same-origin redirect path.
 // It accepts only absolute paths (no scheme/host), rejects CR/LF and backslashes,
 // optionally rejects targets containing a specified resource identifier (badID),
@@ -44,8 +49,24 @@ import (
 //   - A relative path (not an external URL)
 //   - Free of header injection characters
 //   - Does not reference the deleted resource ID
+//   - Not in the DefaultExcludedPaths list (e.g., /logout, /login)
 //   - Falls back to a safe default if any validation fails
+//
+// To allow all paths without exclusions, use SafeReturnRaw.
+// To specify custom exclusions, use SafeReturnExcluding.
 func SafeReturn(ret, badID, fallback string) string {
+	return SafeReturnExcluding(ret, badID, fallback, DefaultExcludedPaths)
+}
+
+// SafeReturnExcluding is like SafeReturn but with custom excluded paths.
+// Pass nil or empty slice for no path exclusions.
+//
+// The exclusion check matches:
+//   - Exact path: "/logout" matches "/logout"
+//   - Path with query string: "/logout" matches "/logout?foo=bar"
+//
+// It does NOT match partial path names (e.g., "/logout" does not match "/logout-help").
+func SafeReturnExcluding(ret, badID, fallback string, excluded []string) string {
 	ret = strings.TrimSpace(ret)
 	if ret == "" {
 		return fallback
@@ -78,7 +99,21 @@ func SafeReturn(ret, badID, fallback string) string {
 	if badID != "" && pathHasSegment(clean, badID) {
 		return fallback
 	}
+
+	// Check excluded paths
+	for _, ex := range excluded {
+		if clean == ex || strings.HasPrefix(clean, ex+"?") {
+			return fallback
+		}
+	}
+
 	return clean
+}
+
+// SafeReturnRaw is like SafeReturn but with no path exclusions.
+// Use this only when you explicitly need to allow paths like /logout as return URLs.
+func SafeReturnRaw(ret, badID, fallback string) string {
+	return SafeReturnExcluding(ret, badID, fallback, nil)
 }
 
 // IsValidAbsHTTPURL reports whether s is an absolute http(s) URL with a host,
