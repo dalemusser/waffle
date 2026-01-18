@@ -1289,3 +1289,48 @@ func (m *DNS01Manager) checkAndRenewIfNeeded() {
 	}
 	_ = renewCtx // suppress unused warning
 }
+
+// ForceRenewal forces an immediate certificate renewal regardless of expiry time.
+// It clears both the in-memory and disk-cached certificates to force a fresh
+// obtainment from the ACME server.
+// Returns the new certificate expiry time on success.
+func (m *DNS01Manager) ForceRenewal(ctx context.Context) (time.Time, error) {
+	m.Logger.Info("forcing certificate renewal", zap.Strings("domains", m.Domains))
+
+	// Clear the in-memory cached certificate
+	m.certMu.Lock()
+	m.cert = nil
+	m.certExpiry = time.Time{}
+	m.certMu.Unlock()
+
+	// Clear the disk-cached certificate files to force ACME renewal
+	prefix := m.cachePrefix()
+	certPath, _ := m.safeCachePath(prefix + ".crt")
+	keyPath, _ := m.safeCachePath(prefix + ".key")
+	if certPath != "" {
+		if err := os.Remove(certPath); err != nil && !os.IsNotExist(err) {
+			m.Logger.Warn("failed to remove cached cert file", zap.String("path", certPath), zap.Error(err))
+		}
+	}
+	if keyPath != "" {
+		if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
+			m.Logger.Warn("failed to remove cached key file", zap.String("path", keyPath), zap.Error(err))
+		}
+	}
+
+	// Trigger certificate obtainment from ACME
+	_, err := m.GetCertificate(nil)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("force renewal failed: %w", err)
+	}
+
+	m.certMu.RLock()
+	newExpiry := m.certExpiry
+	m.certMu.RUnlock()
+
+	m.Logger.Info("forced certificate renewal succeeded",
+		zap.Strings("domains", m.Domains),
+		zap.Time("new_expiry", newExpiry))
+
+	return newExpiry, nil
+}

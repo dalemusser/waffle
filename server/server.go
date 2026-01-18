@@ -158,6 +158,9 @@ func ListenAndServeWithContext(
 			dns01.StartBackgroundRenewal()
 			defer dns01.StopBackgroundRenewal()
 
+			// Register cert renewer for manual renewal capability
+			SetCertRenewer(dns01)
+
 			tlsCfg = &tls.Config{
 				MinVersion:     tls.VersionTLS12,
 				GetCertificate: dns01.GetCertificate,
@@ -208,6 +211,14 @@ func ListenAndServeWithContext(
 			if err := waitForCert(ctx, m, cfg.TLS.Domain, 60*time.Second); err != nil {
 				logger.Warn("autocert pre-warm failed; first HTTPS hits may see TLS errors", zap.Error(err))
 			}
+
+			// Register cert renewer for manual renewal capability
+			SetCertRenewer(&AutocertRenewer{
+				Manager:  m,
+				Domain:   cfg.TLS.Domain,
+				CacheDir: cfg.TLS.LetsEncryptCacheDir,
+				Logger:   logger,
+			})
 
 			tlsCfg = &tls.Config{
 				MinVersion:     tls.VersionTLS12,

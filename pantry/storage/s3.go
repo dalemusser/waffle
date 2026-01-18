@@ -67,14 +67,19 @@ type S3Config struct {
 	StorageClass string
 
 	// CloudFront configuration (optional).
-	// When configured, PresignedURL uses CloudFront signed URLs instead of S3 presigned URLs.
+	// When configured, PresignedURL uses CloudFront URLs instead of S3 presigned URLs.
+	//
+	// Two modes are supported:
+	// 1. Public distribution: Set only CloudFrontURL. Returns unsigned URLs.
+	// 2. Restricted access: Set CloudFrontURL + CloudFrontKeyPairID + key. Returns signed URLs.
 
 	// CloudFrontURL is the CloudFront distribution URL (e.g., "https://d1234.cloudfront.net").
-	// If set, enables CloudFront signed URLs.
+	// If set without signing keys, returns unsigned CloudFront URLs (public distribution).
+	// If set with signing keys, returns signed CloudFront URLs (restricted access).
 	CloudFrontURL string
 
 	// CloudFrontKeyPairID is the CloudFront key pair ID for signing URLs.
-	// Required when CloudFrontURL is set.
+	// Optional. When set, enables signed URLs for restricted access distributions.
 	CloudFrontKeyPairID string
 
 	// CloudFrontPrivateKey is the PEM-encoded RSA private key for signing.
@@ -165,13 +170,11 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 	}
 
 	// Initialize CloudFront signer if configured
+	// If CloudFrontURL is set but no keys are provided, use unsigned URLs (public distribution)
+	// If CloudFrontURL and keys are provided, use signed URLs (restricted access)
 	var cfSigner *sign.URLSigner
 	cfURL := cfg.CloudFrontURL
-	if cfURL != "" {
-		if cfg.CloudFrontKeyPairID == "" {
-			return nil, fmt.Errorf("%w: CloudFrontKeyPairID is required when CloudFrontURL is set", ErrInvalidConfig)
-		}
-
+	if cfURL != "" && cfg.CloudFrontKeyPairID != "" {
 		// Load private key from string or file
 		var keyBytes []byte
 		if cfg.CloudFrontPrivateKey != "" {
@@ -183,7 +186,7 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 				return nil, fmt.Errorf("storage: failed to read CloudFront private key file: %w", err)
 			}
 		} else {
-			return nil, fmt.Errorf("%w: CloudFrontPrivateKey or CloudFrontPrivateKeyPath is required when CloudFrontURL is set", ErrInvalidConfig)
+			return nil, fmt.Errorf("%w: CloudFrontPrivateKey or CloudFrontPrivateKeyPath is required when CloudFrontKeyPairID is set", ErrInvalidConfig)
 		}
 
 		privKey, err := parseRSAPrivateKey(keyBytes)
@@ -613,14 +616,19 @@ func (s *S3) PresignedURL(ctx context.Context, path string, opts *PresignOptions
 		expires = 15 * time.Minute
 	}
 
-	// Use CloudFront signed URL if configured
-	if s.cfSigner != nil {
+	// Use CloudFront URL if configured
+	if s.cfURL != "" {
 		resourceURL := fmt.Sprintf("%s/%s", s.cfURL, key)
-		signedURL, err := s.cfSigner.Sign(resourceURL, time.Now().Add(expires))
-		if err != nil {
-			return "", fmt.Errorf("storage: failed to sign CloudFront URL: %w", err)
+		// If signer is configured, return signed URL (restricted access)
+		// Otherwise return unsigned URL (public distribution)
+		if s.cfSigner != nil {
+			signedURL, err := s.cfSigner.Sign(resourceURL, time.Now().Add(expires))
+			if err != nil {
+				return "", fmt.Errorf("storage: failed to sign CloudFront URL: %w", err)
+			}
+			return signedURL, nil
 		}
-		return signedURL, nil
+		return resourceURL, nil
 	}
 
 	// Fall back to S3 presigned URL
