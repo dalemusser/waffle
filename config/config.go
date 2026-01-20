@@ -90,6 +90,61 @@ type CORSConfig struct {
 	CORSMaxAge           int      `mapstructure:"cors_max_age"`
 }
 
+// SecurityConfig groups security header settings.
+//
+// These headers provide defense-in-depth against common web attacks:
+//   - X-Frame-Options: Prevents clickjacking by controlling iframe embedding
+//   - X-Content-Type-Options: Prevents MIME type sniffing attacks
+//   - Referrer-Policy: Controls referrer information leakage
+//   - X-XSS-Protection: Legacy XSS filter for older browsers
+//   - Strict-Transport-Security: Forces HTTPS connections
+//   - Content-Security-Policy: Powerful XSS and injection prevention
+//   - Permissions-Policy: Controls access to browser features
+type SecurityConfig struct {
+	// EnableSecurityHeaders enables the security headers middleware.
+	// Default: true (security headers are enabled by default)
+	EnableSecurityHeaders bool `mapstructure:"enable_security_headers"`
+
+	// XFrameOptions controls iframe embedding. Values: "DENY", "SAMEORIGIN"
+	// Default: "SAMEORIGIN"
+	XFrameOptions string `mapstructure:"x_frame_options"`
+
+	// XContentTypeOptions prevents MIME sniffing. Should be "nosniff".
+	// Default: "nosniff"
+	XContentTypeOptions string `mapstructure:"x_content_type_options"`
+
+	// ReferrerPolicy controls referrer information sent with requests.
+	// Default: "strict-origin-when-cross-origin"
+	ReferrerPolicy string `mapstructure:"referrer_policy"`
+
+	// XSSProtection enables browser XSS filter. Values: "0", "1", "1; mode=block"
+	// Default: "1; mode=block"
+	XSSProtection string `mapstructure:"x_xss_protection"`
+
+	// HSTSMaxAge sets Strict-Transport-Security max-age in seconds.
+	// Only sent for HTTPS requests. Set to 0 to disable.
+	// Default: 31536000 (1 year)
+	HSTSMaxAge int `mapstructure:"hsts_max_age"`
+
+	// HSTSIncludeSubDomains adds includeSubDomains to HSTS header.
+	// Default: true
+	HSTSIncludeSubDomains bool `mapstructure:"hsts_include_subdomains"`
+
+	// HSTSPreload adds preload directive. Only enable if submitted to preload list.
+	// Default: false
+	HSTSPreload bool `mapstructure:"hsts_preload"`
+
+	// ContentSecurityPolicy sets the CSP header. Leave empty to not set.
+	// Example: "default-src 'self'; script-src 'self' 'unsafe-inline'"
+	// Default: "" (not set - requires application-specific configuration)
+	ContentSecurityPolicy string `mapstructure:"content_security_policy"`
+
+	// PermissionsPolicy controls browser feature access. Leave empty to not set.
+	// Example: "geolocation=(), microphone=(), camera=()"
+	// Default: "" (not set)
+	PermissionsPolicy string `mapstructure:"permissions_policy"`
+}
+
 // CoreConfig holds the core configuration shared by all WAFFLE-based services.
 type CoreConfig struct {
 	// runtime
@@ -97,9 +152,10 @@ type CoreConfig struct {
 	LogLevel string `mapstructure:"log_level"` // debug, info, warn, error …
 
 	// grouped config
-	HTTP HTTPConfig `mapstructure:",squash"`
-	TLS  TLSConfig  `mapstructure:",squash"`
-	CORS CORSConfig `mapstructure:",squash"`
+	HTTP     HTTPConfig     `mapstructure:",squash"`
+	TLS      TLSConfig      `mapstructure:",squash"`
+	CORS     CORSConfig     `mapstructure:",squash"`
+	Security SecurityConfig `mapstructure:",squash"`
 
 	// DB-related timeouts (no URIs/DB names here)
 	DBConnectTimeout time.Duration `mapstructure:"db_connect_timeout"`
@@ -352,6 +408,10 @@ func allKeys() []string {
 		"enable_cors",
 		"cors_allowed_origins", "cors_allowed_methods", "cors_allowed_headers",
 		"cors_exposed_headers", "cors_allow_credentials", "cors_max_age",
+		"enable_security_headers",
+		"x_frame_options", "x_content_type_options", "referrer_policy", "x_xss_protection",
+		"hsts_max_age", "hsts_include_subdomains", "hsts_preload",
+		"content_security_policy", "permissions_policy",
 		"max_request_body_bytes",
 	}
 }
@@ -396,6 +456,18 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("cors_exposed_headers", []string{})
 	v.SetDefault("cors_allow_credentials", false)
 	v.SetDefault("cors_max_age", 0)
+
+	// Security headers - enabled by default with secure values
+	v.SetDefault("enable_security_headers", true)
+	v.SetDefault("x_frame_options", "SAMEORIGIN")
+	v.SetDefault("x_content_type_options", "nosniff")
+	v.SetDefault("referrer_policy", "strict-origin-when-cross-origin")
+	v.SetDefault("x_xss_protection", "1; mode=block")
+	v.SetDefault("hsts_max_age", 31536000) // 1 year
+	v.SetDefault("hsts_include_subdomains", true)
+	v.SetDefault("hsts_preload", false)
+	v.SetDefault("content_security_policy", "") // Requires app-specific config
+	v.SetDefault("permissions_policy", "")      // Requires app-specific config
 
 	v.SetDefault("max_request_body_bytes", int64(2<<20))
 }
