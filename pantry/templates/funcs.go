@@ -2,6 +2,7 @@
 package templates
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/url"
@@ -21,5 +22,15 @@ func Funcs() template.FuncMap {
 		"upper":  strings.ToUpper,
 		"join":   strings.Join,
 		"printf": func(f string, a ...any) string { return fmt.Sprintf(f, a...) },
+
+		// JSON encoding for embedding data in templates
+		// {{ .Data | toJSON }} → JSON string for use in JavaScript
+		"toJSON": func(v any) template.JS {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return template.JS("null")
+			}
+			return template.JS(b)
+		},
 	}
 }
