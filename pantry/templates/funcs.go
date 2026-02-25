@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 // Funcs returns helpers available to all templates.
@@ -33,4 +34,17 @@ func Funcs() template.FuncMap {
 			return template.JS(b)
 		},
 	}
+}
+
+var (
+	customFuncsMu sync.RWMutex
+	customFuncs   = template.FuncMap{}
+)
+
+// RegisterFunc adds a custom template function available to all templates.
+// Call before Boot() — typically from init() in a resources package.
+func RegisterFunc(name string, fn any) {
+	customFuncsMu.Lock()
+	defer customFuncsMu.Unlock()
+	customFuncs[name] = fn
 }

@@ -40,6 +40,13 @@ func New(dev bool) *Engine {
 func (e *Engine) Boot(logger *zap.Logger) error {
 	e.Logger = logger
 
+	// Merge custom template functions registered by the app.
+	customFuncsMu.RLock()
+	for k, v := range customFuncs {
+		e.funcs[k] = v
+	}
+	customFuncsMu.RUnlock()
+
 	sets := All()
 	if len(sets) == 0 {
 		if e.Logger != nil {
